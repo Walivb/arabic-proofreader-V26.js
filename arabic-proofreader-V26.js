@@ -499,7 +499,8 @@
       root.__ARABIC_PROOFREADER_V24_4_READY__ = true;
       root.__ARABIC_PROOFREADER_V24_5_READY__ = true;
       root.__ARABIC_PROOFREADER_V24_4_3_READY__ = true;
-    root.__ARABIC_PROOFREADER_VERSION__ = api.META.version;
+    // V26: أعلن إصدار واجهة V26 الفعلية، لا إصدار META القديم المحفوظ للتوافق.
+    root.__ARABIC_PROOFREADER_VERSION__ = api.V26_VERSION || api.META.version;
       root.__ARABIC_PROOFREADER_V24_3_2_READY__ = true;
       root.__ARABIC_PROOFREADER_V24_3_3_READY__ = true;
     try {
@@ -512,7 +513,7 @@
         }
       });
       if (typeof console !== 'undefined' && console.info) {
-        console.info('[ArabicProofreaderV18] المحرك جاهز — الإصدار ' + api.META.version + ' (' + api.META.edition + ')');
+        console.info('[ArabicProofreaderV26] المحرك جاهز — الإصدار ' + (api.V26_VERSION || api.META.version) + ' (' + api.META.edition + ')');
       }
     } catch (e) { /* رسائل التشخيص يجب ألا تفشل التحميل */ }
   }
@@ -26729,7 +26730,11 @@ function analyzeV26(text,options={}){
   const base=analyzeV25(original,options);
   const context=createContext(original,options);
   const extras=[];
-  const seen=new Set((base.findings||[]).map(v26FindingKey));
+  // لا نضع نتائج V25 في سجل منع التكرار هنا. قد تكون النتيجة القديمة
+  // بنفس النطاق والبديل لكنها «مراجعة فقط»، بينما يملك V26 مرشحًا مراجعًا
+  // قادرًا على الترقية إلى CERTAIN والتصحيح الآلي. تقوم v26MergeFindings
+  // لاحقًا بدمج المتطابق وتفضيل مرشح V26.
+  const seen=new Set();
 
   /* sentence-level role resolution BEFORE candidate generation */
   const profile=v26ContextualSentenceProfile(context);
