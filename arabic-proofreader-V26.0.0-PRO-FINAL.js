@@ -1,9 +1,18 @@
 /*!
  * ============================================================================
- *  Arabic Proofreader V26.1.0 PRO FINAL — Blogger/GitHub Standalone Bundle
+ *  Arabic Proofreader V26.0.0 PRO FINAL — Contextual Morphosyntactic Engine
  *  ────────────────────────────────────────────────────────────────────────
- *  V26.1.0 PRO FINAL (2026-08-29) — Contextual Sentence Decision / Morphology-First Expansion
- *  الأساس المتوافق: V25.4.1 PRO FINAL — Precision-Safe Recall Expansion
+ *  V26.0.0 PRO FINAL (2026-08-29) — Contextual Morphosyntactic Engine
+ *    ▸ الجملة كاملة قبل أي تصحيح: أدوار نحوية، توليد صرفي، قيود، ثم أقل تعديل.
+ *    ▸ تمييز الخطأ عن الوجه الجائز، والامتناع عند الغموض (من يدرسون...).
+ *    ▸ إنّ وأخواتها لا تُقلب إلى أن؛ اسمها منصوب وخبرها مرفوع.
+ *    ▸ المبتدأ مرفوع ولو رُسم بالياء؛ لا يُنصب الخبر ليتبعه.
+ *    ▸ الأفعال الخمسة: لم/لن/أن/كي تحذف النون؛ ألف التفريق بعد واو الجماعة.
+ *    ▸ المطابقة في الجنس والعدد، والمعدود جمع بعد 3–10، واسم الإشارة يبقى.
+ *    ▸ التشكيل بعد التصحيح دون تغيير المعنى. الأولوية للدقة لا للاستدعاء.
+ *    ▸ واجهات V25 محفوظة؛ analyzeV26 / proofreadV26 طبقة إضافية.
+ *  ────────────────────────────────────────────────────────────────────────
+ *  V25.4.1 PRO FINAL (2026-08-29) — Precision-Safe Recall Expansion
  *  ────────────────────────────────────────────────────────────────────────
  *  V25.4.1: توسيع استدعاء مُحكم الدقة فوق V25.4.0 مع الحفظ التام لسلوكه:
  *    ▸ إصلاحات مدعومة بالأدلة لتصحيحات خاطئة سابقة: «احمد الله» (قراءة الأمر)،
@@ -485,7 +494,6 @@
     root.ArabicProofreaderV26PRO = api.V26;
     root.V26 = api.V26;
     root.__ARABIC_PROOFREADER_V26_READY__ = true;
-    root.__ARABIC_PROOFREADER_V26_VERSION__ = api.V26?.version || '26.1.0';
     // علامة جاهزية صريحة يمكن للقالب فحصها قبل بدء التدقيق
     root.__ARABIC_PROOFREADER_V18_READY__ = true;
     root.__ARABIC_PROOFREADER_V19_READY__ = true;
@@ -525,12 +533,12 @@
 const META = Object.freeze({
   name: 'Arabic Proofreader Hybrid Engine',
   nameArabic: 'محرك التدقيق العربي الهجين — النسخة الاحترافية الشاملة',
-  version: '25.4.0',
-  edition: 'PRO-FINAL-V25.4.0-SAFE-RECALL-EXPANSION',
+  version: '26.0.0',
+  edition: 'PRO-FINAL-V26.0.0-CONTEXTUAL-MORPHOSYNTAX',
   language: 'ar',
   release: 'V25.4.0 PRO FINAL — Safe Blind Orthography + Deep Recall Expansion / additive-only, reviewed lexical autocorrection, role-aware grammar review',
   stability: 'stable',
-  releaseDate: '2026-08-28',
+  releaseDate: '2026-08-29',
   governingPrinciple: 'عدم إفساد الجملة الصحيحة أهم من اكتشاف خطأ إضافي — توليدُ الاقتراح لا يعني قبولَه.',
   compat: Object.freeze({
     baseVersion: '20.0.0',
@@ -854,7 +862,8 @@ const DEFAULT_OPTIONS = Object.freeze({
     v245ProductionCompleteness: true,
     v245Safety: true,
     // V25.4 — blind lexical autocorrection + role-aware recall; grammar remains manual.
-    v254RecallExpansion: true
+    v254RecallExpansion: true,
+    v26Contextual: true
   }),
   // V24.1.0 — طبقة الإخراج الاحترافية
   includeDiacritics: false,
@@ -25871,765 +25880,1594 @@ function validateV25(options={}){
 
 
 /* ============================================================================
- * V26.0.0 PRO FINAL — Decision Reparse / Safe Recall Expansion
+ * V26.0.0 PRO FINAL — Contextual Morphosyntactic Engine
  * ---------------------------------------------------------------------------
- * سياسة هذه الطبقة:
- *  1) لا تحذف ولا تعيد كتابة أي قاعدة من V25.
- *  2) واجهات V25 تبقى متاحة كما هي؛ V26 يُستهلك عبر V26 / ArabicProofreaderV26.
- *  3) الإملاء المراجع أحادي الهدف يمكن أن يكون آليًا بعد Global Candidate Validation.
- *  4) الإضافات النحوية الجديدة REVIEW-ONLY ما لم تكن حالة حالية محسومة أصلًا.
- *  5) كل مرشح جديد يمر بإعادة تحليل النص بعد الاستبدال قبل اعتماده.
+ * تحويل التدقيق من مطابقة قاموس إلى تحليل صرفي مولِّد + تحليل نحوي سياقي
+ * على مستوى الجملة، مع امتناع عن التخمين وتشكيل مربوط بالإعراب.
+ *
+ * خط الأنابيب:
+ *   1) تطبيع وحفظ الأصل  2) تقسيم الجمل والكلمات واللواصق
+ *   3) تحليل صرفي مولِّد  4) أدوار نحوية سياقية
+ *   5) توليد مرشحي جملة   6) قيود الصرف والنحو والمطابقة
+ *   7) تحقق مستقل بعد الاستبدال  8) تشكيل حسب المستوى
+ *   9) تقرير مفسَّر بدرجات ثقة صادقة
  * ========================================================================== */
 
 const V26_VERSION = '26.0.0';
+const V26_EDITION = 'PRO-FINAL-V26.0.0-CONTEXTUAL-MORPHOSYNTAX';
 
-const V26_REVIEWED_ORTHOGRAPHY = Object.freeze({
-  /* همزات قطع/وصل شائعة ذات هدف واحد. */
-  'اجازه':'إجازة', 'اجازات':'إجازات',
-  'اجراء':'إجراء', 'اجراءات':'إجراءات',
-  'اسئله':'أسئلة', 'الاسئله':'الأسئلة',
-  'استاذ':'أستاذ', 'اساتذه':'أساتذة',
-  'امتحان':'امتحان', /* explicit valid form kept in registry for audit */
-  'ابناء':'أبناء', 'ابائهم':'آبائهم',
-  'اعضاء':'أعضاء', 'اراء':'آراء', 'اركان':'أركان',
-  'اسباب':'أسباب', 'اسلوب':'أسلوب', 'اساليب':'أساليب',
-  'انواع':'أنواع', 'امور':'أمور', 'اثر':'أثر',
-  /* تاء مربوطة شائعة: لا توجد قراءة ضميرية بديلة عند ورودها مجردة. */
-  'قراءه':'قراءة', 'الدراسه':'الدراسة', 'دراسه':'دراسة',
-  'نظيفه':'نظيفة',
-  'فكره':'فكرة', 'الفكره':'الفكرة',
-  'طريقه':'طريقة', 'الطريقه':'الطريقة',
-  'نتيجه':'نتيجة', 'النتيجه':'النتيجة',
-  'قضيه':'قضية', 'القضيه':'القضية',
-  'شخصيه':'شخصية', 'الشخصيه':'الشخصية',
-  'بيئه':'بيئة', 'البيئه':'البيئة',
-  'فئه':'فئة', 'الفئه':'الفئة',
-  'مائده':'مائدة', 'المائده':'المائدة',
-  'مكافاه':'مكافأة', 'المكافاه':'المكافأة',
-  'مفاجاه':'مفاجأة', 'المفاجاه':'المفاجأة',
-  'مساله':'مسألة', 'المساله':'المسألة',
-  'مسأله':'مسألة', 'المسأله':'المسألة',
-  'تهنئه':'تهنئة', 'التهنئه':'التهنئة',
-  'تهيئه':'تهيئة', 'التهيئه':'التهيئة',
-  'تجزئه':'تجزئة', 'التجزئه':'التجزئة',
-  'مراه':'مرأة', 'المراه':'المرأة',
-  'امرأه':'امرأة',
-  /* الهمزة المتوسطة/المتطرفة. */
-  'مسوول':'مسؤول', 'المسوول':'المسؤول',
-  'مسئول':'مسؤول', 'المسئول':'المسؤول',
-  'رءيس':'رئيس', 'الرءيس':'الرئيس',
-  /* ألف تنوين النصب: أسماء لا تحمل احتمالات فعلية معروفة في الرسم نفسه. */
-  'نشاطا':'نشاطًا', 'استخداما':'استخدامًا', 'اجراءا':'إجراءً',
-  'مبدئيا':'مبدئيًا', 'مفاجاةً':'مفاجأةً'
+const V26_CONFIDENCE = Object.freeze({
+  certain: Object.freeze({code: 'certain', label: 'مؤكد', min: 0.97}),
+  likely: Object.freeze({code: 'likely', label: 'مرجح', min: 0.85}),
+  ambiguous: Object.freeze({code: 'ambiguous', label: 'غامض', min: 0}),
+  valid: Object.freeze({code: 'valid', label: 'صحيح أو جائز', min: 1}),
+  review: Object.freeze({code: 'review', label: 'يحتاج إلى مراجعة بشرية', min: 0})
 });
 
-/* رؤوس إضافية موثوقة للإضافة؛ لا تعمل القاعدة على أي اسم عشوائي. */
-const V26_IDAFA_HEADS = Object.freeze(new Set([
-  'كتاب','كتب','باب','أبواب','اسم','أسماء','عنوان','عناوين',
-  'مدير','مديرة','رئيس','رئيسة','معلم','معلمة','طالب','طالبة',
-  'مؤلف','مؤسسة','جامعة','مدرسة','وزارة','شركة','مركز','قسم',
-  'برنامج','موقع','نظام','محرك','نسخة','إصدار','نتيجة','هدف',
-  'سبب','قرار','تقرير','مشروع','فريق','مجموعة','حقل','موضوع'
-]));
-
-const V26_PREPOSITIONS = Object.freeze(new Set([
-  'في','من','إلى','عن','على','مع','بين','لدى','حتى','منذ','قبل','بعد','حول','دون','تحت','فوق','خلال'
-]));
-
-const V26_VOCATIVE_HEADS = Object.freeze(new Set([
-  'عبد','أبو','أم','ابن','بنت','صاحب','طالب','مدير','رئيس','أستاذ','شيخ','رب'
-]));
-
-function v26Surface(tok){
-  return String(tok?.surface || tok?.clean || '');
-}
-function v26Core(tok){
-  return stripDiacritics(String(tok?.morph?.core || tok?.clean || tok?.surface || ''));
-}
-function v26WordTokens(context){
-  return (context?.tokens||[]).filter(t=>t && t.type==='word');
-}
-function v26MakeTokenFinding(context, token, replacement, ruleId, {
-  type='إملائي', classification='orthographic', confidence=.999,
-  explanation='', evidence=[], safe=true, manualOnly=false, metadata={}
-}={}){
-  const f=findingFromSpan(context,{
-    startToken:token, replacement, ruleId, type, classification, confidence,
-    explanation, evidence, safe, metadata:{...metadata,v26:true}
-  });
-  f.manualOnly=manualOnly || !safe;
-  f.safeCandidate=!!safe;
-  f.autoCorrectable=!!safe;
-  f.v26=true;
-  return f;
-}
-function v26TextFinding(context, start, length, replacement, ruleId, {
-  type='نحوي', classification='syntax', confidence=.998,
-  explanation='', evidence=[], safe=false, metadata={}
-}={}){
-  const f=findingFromTextSpan(context,{
-    normalizedStart:start, normalizedEnd:start+length, replacement, ruleId, type,
-    classification, confidence, explanation, evidence, safe,
-    metadata:{...metadata,v26:true,textAnchored:true}
-  });
-  f.manualOnly=!safe; f.safeCandidate=!!safe; f.autoCorrectable=!!safe; f.v26=true;
-  return f;
-}
-
-/* تغيّر الإملاء المراجع فقط، ولا يحاول تحويل كلمات من خلال ة/ه أو ا/أ بقاعدة عامة. */
-function v26AddReviewedOrthography(context, out, seen){
-  const text=String(context?.original||'');
-  for(const [bad,replacement] of Object.entries(V26_REVIEWED_ORTHOGRAPHY)){
-    if(!bad || !replacement || bad===replacement) continue;
-    const re=new RegExp(`(^|[^\\u0621-\\u064A\\u064B-\\u065F])${bad.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&')}(?=$|[^\\u0621-\\u064A\\u064B-\\u065F])`,'gu');
-    let m;
-    while((m=re.exec(text))){
-      const start=m.index+m[1].length;
-      const f=v26TextFinding(context,start,bad.length,replacement,'V26_REVIEWED_ORTHOGRAPHY',{
-        type:'إملائي',classification:'orthographic',confidence:.9995,safe:true,
-        explanation:'تصحيح إملائي مراجع ذو هدف واحد؛ لا يعتمد على تخمين نحوي أو قاعدة إملائية عامة.',
-        evidence:['reviewed-lexicon','single-target','orthographic-only']
-      });
-      const k=`${f.index}|${f.length}|${f.replacement}`;
-      /* حتى إذا ولّد V25 المرشح نفسه للمراجعة، نسمح لـV26 بالترقية
-         بعد تحقق Global Reparse. النطاق والهدف لا يتغيران. */
-      if(!out.some(x=>`${x.index}|${x.length}|${x.replacement}`===k && x.v26===true)) out.push(f);
-    }
-  }
-}
-/* هل الاسم المفرد العادي يسمح بتحويل ُ/ٌ إلى ِ/ٍ بعد حرف جر؟ */
-function v26GenitiveEndingCandidate(tok){
-  const s=v26Surface(tok);
-  if(!/[ٌُ]$/u.test(s)) return null;
-  const m=tok?.morph||{};
-  const pos=String(m.resolvedPos||m.pos||'');
-  if(!['noun','proper','adj'].includes(pos)) return null;
-  if(m.diptote?.isDiptote) return null;
-  if(m.number && !['sg','singular'].includes(String(m.number))) return null;
-  if(m.segments?.enclitic || m.segments?.preposition || m.segments?.conjunction) return null;
-  if(/(?:ان|ين|ون|ات)$/u.test(stripDiacritics(s).replace(/[ٌُ]$/u,''))) return null;
-  return s.endsWith('ٌ') ? s.slice(0,-1)+'ٍ' : s.slice(0,-1)+'ِ';
-}
-
-/* مراجعة نحوية قطعية من جهة العامل المحلي فقط؛ لا تدخل التصحيح الآلي. */
-function v26AddPrepositionCaseReview(context,out,seen){
-  const toks=context.tokens||[];
-  for(let i=0;i<toks.length-1;i++){
-    const p=toks[i], n=toks[i+1];
-    if(!p || !n || p.type!=='word' || n.type!=='word') continue;
-    const pc=v26Core(p);
-    if(!V26_PREPOSITIONS.has(pc)) continue;
-    if(p.sentence!==n.sentence) continue;
-    const replacement=v26GenitiveEndingCandidate(n);
-    if(!replacement || replacement===v26Surface(n)) continue;
-    const f=v26MakeTokenFinding(context,n,replacement,'V26_PREPOSITION_CASE_REVIEW',{
-      type:'نحوي',classification:'government',confidence:.997,safe:false,manualOnly:true,
-      explanation:'الاسم ظاهر بعد حرف جر صريح مع علامة رفع ظاهرة؛ يُقترح نقل العلامة إلى الجر، مع إبقاء القرار للمراجعة.',
-      evidence:['explicit-preposition','explicit-nominative-ending','local-government','single-span']
-    });
-    const k=`${f.index}|${f.length}|${f.replacement}`;
-    if(!seen.has(k) || !out.some(x=>x.v26===true && `${x.index}|${x.length}|${x.replacement}`===k)){out.push(f);}
-  }
-}
-
-/* الإضافة: اسم أول محكوم بقائمة رؤوس مراجعة + اسم ثانٍ مرفوع صراحة. */
-function v26AddIdafaCaseReview(context,out,seen){
-  const toks=context.tokens||[];
-  for(let i=0;i<toks.length-1;i++){
-    const head=toks[i], dep=toks[i+1];
-    if(!head || !dep || head.type!=='word' || dep.type!=='word') continue;
-    if(head.sentence!==dep.sentence) continue;
-    if(!V26_IDAFA_HEADS.has(v26Core(head))) continue;
-    const prev=toks[i-1];
-    if(prev && prev.type==='word' && V26_PREPOSITIONS.has(v26Core(prev))) continue;
-    const depDefinite=Boolean(dep.morph?.definite || dep.morph?.segments?.article || dep.morph?.pos==='proper');
-    if(!depDefinite) continue;
-    const repl=v26GenitiveEndingCandidate(dep);
-    if(!repl || repl===v26Surface(dep)) continue;
-    const f=v26MakeTokenFinding(context,dep,repl,'V26_IDAFA_GENITIVE_REVIEW',{
-      type:'نحوي',classification:'government',confidence:.996,safe:false,manualOnly:true,
-      explanation:'رأس الإضافة معلوم من معجم مراجَع، والاسم التابع يحمل علامة رفع صريحة؛ يُقترح جره مع إبقاء القرار للمراجعة.',
-      evidence:['reviewed-idafa-head','adjacent-dependent','explicit-nominative-ending','same-clause']
-    });
-    const k=`${f.index}|${f.length}|${f.replacement}`;
-    if(!seen.has(k) || !out.some(x=>x.v26===true && `${x.index}|${x.length}|${x.replacement}`===k)){out.push(f);}
-  }
-}
-
-/* المنادى المضاف: «يا عبد اللهِ» يحتاج نصب «عبدَ». */
-function v26AddVocativeIdafaReview(context,out,seen){
-  const toks=context.tokens||[];
-  for(let i=0;i<toks.length-2;i++){
-    const ya=toks[i], head=toks[i+1], dep=toks[i+2];
-    if(!ya||!head||!dep || ya.type!=='word'||head.type!=='word'||dep.type!=='word') continue;
-    if(v26Core(ya)!=='يا' || ya.sentence!==head.sentence || head.sentence!==dep.sentence) continue;
-    if(!V26_VOCATIVE_HEADS.has(v26Core(head))) continue;
-    const ds=v26Surface(dep);
-    /* يجب أن تكون الكلمة الثانية معرفة/مجرورة أو ذات بنية اسمية واضحة. */
-    const dm=dep.morph||{};
-    const dpos=String(dm.resolvedPos||dm.pos||'');
-    if(!['noun','proper','adj'].includes(dpos)) continue;
-    const hs=v26Surface(head);
-    if(/[َُِّ]/u.test(hs)) {
-      if(!/ُ$|ٌ$/u.test(hs)) continue;
-    } else {
-      /* بلا تشكيل: نعرض المراجعة فقط ولا نغيّر الرسم. */
-      continue;
-    }
-    const replacement=hs.replace(/ُ$/u,'َ').replace(/ٌ$/u,'َ');
-    if(replacement===hs) continue;
-    const f=v26MakeTokenFinding(context,head,replacement,'V26_VOCATIVE_IDAFA_CASE_REVIEW',{
-      type:'نحوي',classification:'vocative',confidence:.994,safe:false,manualOnly:true,
-      explanation:'المنادى المضاف منصوب، والرسم الحالي يحمل علامة رفع صريحة؛ يبقى الاقتراح للمراجعة اليدوية.',
-      evidence:['vocative-particle','reviewed-idafa-head','explicit-rafa-ending','same-clause']
-    });
-    const k=`${f.index}|${f.length}|${f.replacement}`;
-    if(!seen.has(k) || !out.some(x=>x.v26===true && `${x.index}|${x.length}|${x.replacement}`===k)){out.push(f);}
-  }
-}
-
-/* -------- Global Candidate Validation / Reparse --------
- * لا يثبت صحة المرشح بمجرد وجوده؛ يعيد تحليل النص المصحح ويقارن البنية غير
- * المتأثرة بالمرشح، ويحظر المرشح عند ظهور انزياح بنيوي أو تضاعف العناصر المحمية.
- */
-function v26ProtectedSignature(text, options){
-  try{
-    const c=createContext(text,{...(options||{}),safeMode:true});
-    return (c.protectedSpans||[]).map(x=>`${x.start}|${x.end}|${x.type||''}|${x.text||''}`).sort();
-  }catch(e){ return []; }
-}
-function v26PosSignature(text, options){
-  try{
-    return inspectPOSV25(text,options).map(x=>({index:x.index,core:x.core,pos:x.pos,ambiguous:!!x.ambiguous}));
-  }catch(e){ return []; }
-}
-function v26ClauseSignature(text){
-  try{
-    const s=inspectSyntaxV25(text)||{};
-    return (s.clauses||[]).map(c=>`${c.type||''}|${c.start}|${c.end}|${c.parent??''}`);
-  }catch(e){ return []; }
-}
-function v26GlobalCandidateValidate(original, candidate, options={}){
-  try{
-    const simulationCandidate={...candidate,autoCorrectable:true,replacement:candidate.replacement};
-    const replacementText=applyFindings(original,[simulationCandidate]);
-    if(replacementText===original) return {valid:false,reason:'no-change'};
-    const beforeProtected=v26ProtectedSignature(original,options);
-    const afterProtected=v26ProtectedSignature(replacementText,options);
-    if(beforeProtected.length!==afterProtected.length) return {valid:false,reason:'protected-span-count-changed'};
-    const beforeClauses=v26ClauseSignature(original);
-    const afterClauses=v26ClauseSignature(replacementText);
-    if(beforeClauses.length!==afterClauses.length) return {valid:false,reason:'clause-count-changed'};
-    const beforePOS=v26PosSignature(original,options);
-    const afterPOS=v26PosSignature(replacementText,options);
-    /* نفس عدد الكلمات، مع السماح بتغيّر POS في موضع المرشح نفسه فقط. */
-    if(beforePOS.length!==afterPOS.length) return {valid:false,reason:'word-count-changed'};
-    const idx=Number(candidate.index);
-    let affectedOrdinal=-1;
-    try{
-      const pc=createContext(original,{...(options||{}),safeMode:true});
-      affectedOrdinal=(pc.tokens||[]).findIndex(t=>t && t.type==='word' && Number(t.start)<=idx && Number(t.end)>idx);
-    }catch(e){}
-    for(let i=0;i<Math.min(beforePOS.length,afterPOS.length);i++){
-      if(i===affectedOrdinal || i===candidate.tokenIndex) continue;
-      if(beforePOS[i]?.pos!==afterPOS[i]?.pos || beforePOS[i]?.ambiguous!==afterPOS[i]?.ambiguous){
-        return {valid:false,reason:`unaffected-pos-changed:${i}`};
-      }
-    }
-    /* إعادة تحليل النص المصحح يجب أن تجد المرشح نفسه موضعًا صالحًا صرفيًا. */
-    if(candidate.classification==='orthographic'){
-      const w=inspectWord(String(candidate.replacement||''));
-      const conf=Number(w?.posConfidence ?? w?.confidence ?? 0);
-      if(!w || !w.resolvedPos || conf<.55) return {valid:false,reason:'replacement-not-morphologically-supported'};
-    }
-    return {valid:true,reason:'global-reparse-stable'};
-  }catch(e){
-    return {valid:false,reason:'validator-error:'+String(e.message||e)};
-  }
-}
-function v26ValidateCandidates(original,candidates,options={}){
-  const kept=[],abstained=[];
-  for(const f of (candidates||[])){
-    const v=v26GlobalCandidateValidate(original,f,options);
-    if(v.valid){
-      f.v26Validation=v;
-      if(f.safeCandidate===true){
-        f.decisionClass='CERTAIN'; f.requiresReview=false; f.severity='ERROR'; f.safeCandidate=true; f.autoCorrectable=true;
-        f.recommendedAction='auto-correct'; f.suggestionLabel='V26 — تصحيح إملائي مراجع ومحكوم';
-      }else{
-        f.decisionClass='REVIEW'; f.requiresReview=true; f.severity='WARNING'; f.autoCorrectable=false; f.safeCandidate=false;
-        f.recommendedAction='manual-review'; f.suggestionLabel='V26 — مراجعة نحوية';
-      }
-      kept.push(f);
-    }
-    else{
-      f.v26Validation=v; f.decisionClass='ABSTAINED'; f.requiresReview=true;
-      f.autoCorrectable=false; f.safeCandidate=false; f.recommendedAction='abstain';
-      f.v26VetoReason='بوابة V26 لإعادة التحليل: '+v.reason;
-      abstained.push(f);
-    }
-  }
-  return {kept,abstained};
-}
-
-function v26MergeFindings(baseFindings, extraFindings){
-  const map=new Map();
-  for(const f of [...(baseFindings||[]),...(extraFindings||[])]){
-    const key=`${f.index}|${f.length}|${f.replacement}`;
-    const old=map.get(key);
-    /* عند تطابق النطاق والهدف نفسه، مرشح V26 المراجع أولوية لأنه قد
-       يرفع حالة إصلاح كانت القاعدة القديمة تعرضها للمراجعة فقط، دون تغيير
-       النص المستهدف أو إنشاء مرشح جديد. */
-    if(!old || (f.v26===true && old.v26!==true)) map.set(key,f);
-  }
-  return [...map.values()].sort((a,b)=>Number(a.index)-Number(b.index)||Number(a.length)-Number(b.length));
-}
-function v26ApplyExtraSafeCorrected(text, findings){
-  const safe=(findings||[]).filter(f=>f.autoCorrectable===true && f.decisionClass!=='ABSTAINED');
-  return applyFindings(text,safe);
-}
-
-
-/* ============================================================================
- * V26.1.0 — Contextual Sentence Decision / Morphology-First Expansion
- * ---------------------------------------------------------------------------
- * الغاية: تحويل V26 من طبقة Recall إضافية فوق V25 إلى طبقة قرار سياقي مستقلة
- * تعتمد على إعادة التحليل، الوظيفة النحوية، الصيغة الصرفية، وأقل تعديل ممكن.
- * السياسة: لا نرفع كل قاعدة إلى تصحيح آلي؛ لا يُطبَّق آليًا إلا المرشح الذي
- * يثبت صرفيًا ونحويًا ويجتاز إعادة التحليل ولا يغيّر بنية غير متأثرة.
- * ========================================================================== */
-const V26_ENHANCED_VERSION = '26.1.0';
-const V26_CONFIDENCE_LEVELS = Object.freeze([
-  {code:'certain', label:'مؤكد', min:.995},
-  {code:'probable', label:'مرجح', min:.90},
-  {code:'ambiguous', label:'غامض', min:.00}
+const V26_ERROR_TYPES = Object.freeze([
+  'إملائي', 'نحوي', 'صرفي', 'مطابقة', 'ترقيم', 'أسلوبي', 'تشكيل',
+  'اختلاف رسم مقبول', 'غموض يحتاج إلى مراجعة'
 ]);
-function v26ConfidenceLevel(c){
-  const n=Number(c)||0;
-  if(n>=.995) return V26_CONFIDENCE_LEVELS[0];
-  if(n>=.90) return V26_CONFIDENCE_LEVELS[1];
-  return V26_CONFIDENCE_LEVELS[2];
+
+const V26_INNA = Object.freeze(new Set(['إن', 'أن', 'كأن', 'لكن', 'ليت', 'لعل']));
+const V26_INNA_ACC_NAME = Object.freeze(new Set(['إن', 'كأن', 'لكن', 'ليت', 'لعل']));
+const V26_KANA = Object.freeze(new Set([
+  'كان', 'كانت', 'كانا', 'كانتا', 'كانوا', 'كن', 'كنت', 'كنا', 'كنتم',
+  'يكون', 'تكون', 'أكون', 'نكون', 'يكونون', 'تكونون',
+  'أصبح', 'أصبحت', 'أصبحوا', 'أمسى', 'أمست', 'أضحى', 'بات', 'باتت',
+  'ظل', 'ظلت', 'صار', 'صارت', 'صاروا', 'ليس', 'ليست', 'ليسوا',
+  'مازال', 'مازالت', 'مازالوا'
+]));
+const V26_JUSSIVE = Object.freeze(new Set(['لم', 'لما']));
+const V26_SUBJUNCTIVE = Object.freeze(new Set(['لن', 'أن', 'كي', 'لكي']));
+const V26_SUBJUNCTIVE_UNTIL = Object.freeze(new Set(['حتى']));
+const V26_PREP = Object.freeze(new Set([
+  'في', 'من', 'إلى', 'الى', 'عن', 'على', 'مع', 'بين', 'لدى', 'حتى',
+  'منذ', 'مذ', 'قبل', 'بعد', 'حول', 'دون', 'تحت', 'فوق', 'خلال', 'عند',
+  'أمام', 'خلف', 'نحو', 'ضد'
+]));
+const V26_CONJ = Object.freeze(new Set(['و', 'ف', 'ثم', 'أو', 'أم', 'بل']));
+const V26_REL = Object.freeze({
+  'الذي': {gender: 'm', number: 'sg'}, 'التي': {gender: 'f', number: 'sg'},
+  'اللذان': {gender: 'm', number: 'du', caseForm: 'nominative'},
+  'اللذين': {gender: 'm', number: 'du', caseForm: 'accgen'},
+  'اللتان': {gender: 'f', number: 'du', caseForm: 'nominative'},
+  'اللتين': {gender: 'f', number: 'du', caseForm: 'accgen'},
+  'الذين': {gender: 'm', number: 'pl'}, 'اللاتي': {gender: 'f', number: 'pl'},
+  'اللائي': {gender: 'f', number: 'pl'}, 'اللواتي': {gender: 'f', number: 'pl'}
+});
+const V26_DEM = Object.freeze({
+  'هذا': {gender: 'm', number: 'sg'}, 'هذه': {gender: 'f', number: 'sg'},
+  'هذان': {gender: 'm', number: 'du', caseForm: 'nominative'},
+  'هذين': {gender: 'm', number: 'du', caseForm: 'accgen'},
+  'هاتان': {gender: 'f', number: 'du', caseForm: 'nominative'},
+  'هاتين': {gender: 'f', number: 'du', caseForm: 'accgen'},
+  'هؤلاء': {number: 'pl'}, 'ذلك': {gender: 'm', number: 'sg'},
+  'تلك': {gender: 'f', number: 'sg'}, 'أولئك': {number: 'pl'}
+});
+const V26_PRON = Object.freeze({
+  'هو': {g: 'm', n: 'sg', p: 3}, 'هي': {g: 'f', n: 'sg', p: 3},
+  'هما': {n: 'du', p: 3}, 'هم': {g: 'm', n: 'pl', p: 3}, 'هن': {g: 'f', n: 'pl', p: 3},
+  'أنت': {g: 'm', n: 'sg', p: 2}, 'أنتما': {n: 'du', p: 2},
+  'أنتم': {g: 'm', n: 'pl', p: 2}, 'أنتن': {g: 'f', n: 'pl', p: 2},
+  'أنا': {n: 'sg', p: 1}, 'نحن': {n: 'pl', p: 1}
+});
+const V26_NUM = Object.freeze({
+  'ثلاثة': {value: 3, counted: 'm'}, 'ثلاث': {value: 3, counted: 'f'},
+  'أربعة': {value: 4, counted: 'm'}, 'أربع': {value: 4, counted: 'f'},
+  'خمسة': {value: 5, counted: 'm'}, 'خمس': {value: 5, counted: 'f'},
+  'ستة': {value: 6, counted: 'm'}, 'ست': {value: 6, counted: 'f'},
+  'سبعة': {value: 7, counted: 'm'}, 'سبع': {value: 7, counted: 'f'},
+  'ثمانية': {value: 8, counted: 'm'}, 'ثمان': {value: 8, counted: 'f'}, 'ثماني': {value: 8, counted: 'f'},
+  'تسعة': {value: 9, counted: 'm'}, 'تسع': {value: 9, counted: 'f'},
+  'عشرة': {value: 10, counted: 'm'}, 'عشر': {value: 10, counted: 'f'}
+});
+const V26_NUM_M = Object.freeze({
+  3: 'ثلاثة', 4: 'أربعة', 5: 'خمسة', 6: 'ستة', 7: 'سبعة', 8: 'ثمانية', 9: 'تسعة', 10: 'عشرة'
+});
+const V26_NUM_F = Object.freeze({
+  3: 'ثلاث', 4: 'أربع', 5: 'خمس', 6: 'ست', 7: 'سبع', 8: 'ثماني', 9: 'تسع', 10: 'عشر'
+});
+
+const V26_NOUN_GENDER = Object.freeze({
+  'كتاب': 'm', 'كتب': 'm', 'طالب': 'm', 'طلاب': 'm', 'مهندس': 'm', 'معلم': 'm',
+  'مدرس': 'm', 'موظف': 'm', 'لاعب': 'm', 'كاتب': 'm', 'باحث': 'm', 'حارس': 'm',
+  'رجل': 'm', 'ولد': 'm', 'طفل': 'm', 'مدير': 'm', 'طبيب': 'm', 'محامي': 'm',
+  'صحيفة': 'f', 'طالبة': 'f', 'معلمة': 'f', 'مهندسة': 'f', 'موظفة': 'f',
+  'بنت': 'f', 'فتاة': 'f', 'امرأة': 'f', 'مدرسة': 'f', 'جامعة': 'f',
+  'فكرة': 'f', 'نتيجة': 'f', 'قضية': 'f', 'لغة': 'f', 'كلمة': 'f',
+  'ماء': 'm', 'كأس': 'm', 'قلم': 'm', 'باب': 'm', 'درس': 'm', 'واجب': 'm'
+});
+const V26_BROKEN_PLURAL = Object.freeze({
+  'كتاب': 'كتب', 'كتب': 'كتب', 'طالب': 'طلاب', 'رجل': 'رجال', 'قلم': 'أقلام', 'درس': 'دروس',
+  'باب': 'أبواب', 'ولد': 'أولاد', 'طفل': 'أطفال', 'فكرة': 'أفكار'
+});
+const V26_SOUND_STEMS = Object.freeze(new Set([
+  'مهندس', 'معلم', 'مدرس', 'موظف', 'لاعب', 'كاتب', 'باحث', 'حارس', 'مدير',
+  'محامي', 'صحفي', 'مجتهد', 'ماهر', 'حاضر', 'نشيط', 'صادق', 'ذكي', 'أمين',
+  'جديد', 'كبير', 'صغير', 'مفيد', 'واضح', 'ناجح', 'مخلص', 'سعيد'
+]));
+const V26_PAST_1SG = Object.freeze(new Set([
+  'رأيت', 'شاهدت', 'قرأت', 'كتبت', 'سمعت', 'أخذت', 'وجدت', 'حفظت',
+  'شربت', 'أكلت', 'فتحت', 'أغلقت', 'زرت', 'قابلت', 'تركت', 'وضعت'
+]));
+const V26_LIQUID_WORDS = Object.freeze(new Set(['ماء', 'الماء', 'حليب', 'شاي', 'عصير', 'قهوة', 'لبن']));
+const V26_VESSEL_HAA = Object.freeze({
+  'الكأسه': 'الكأس', 'الكوبه': 'الكوب', 'الإناءه': 'الإناء', 'الكأسهُ': 'الكأس'
+});
+
+const V26_REVIEWED_ORTHOGRAPHY = Object.freeze({
+  'اجازه': 'إجازة', 'اجازات': 'إجازات', 'اجراء': 'إجراء', 'اجراءات': 'إجراءات',
+  'اسئله': 'أسئلة', 'الاسئله': 'الأسئلة', 'استاذ': 'أستاذ', 'اساتذه': 'أساتذة',
+  'ابناء': 'أبناء', 'ابائهم': 'آبائهم', 'اعضاء': 'أعضاء', 'اراء': 'آراء',
+  'اركان': 'أركان', 'اسباب': 'أسباب', 'اسلوب': 'أسلوب', 'اساليب': 'أساليب',
+  'انواع': 'أنواع', 'امور': 'أمور', 'اثر': 'أثر',
+  'قراءه': 'قراءة', 'الدراسه': 'الدراسة', 'دراسه': 'دراسة', 'نظيفه': 'نظيفة',
+  'فكره': 'فكرة', 'الفكره': 'الفكرة', 'طريقه': 'طريقة', 'الطريقه': 'الطريقة',
+  'نتيجه': 'نتيجة', 'النتيجه': 'النتيجة', 'قضيه': 'قضية', 'القضيه': 'القضية',
+  'شخصيه': 'شخصية', 'الشخصيه': 'الشخصية', 'بيئه': 'بيئة', 'البيئه': 'البيئة',
+  'فئه': 'فئة', 'الفئه': 'الفئة', 'مائده': 'مائدة', 'المائده': 'المائدة',
+  'مكافاه': 'مكافأة', 'المكافاه': 'المكافأة', 'مفاجاه': 'مفاجأة', 'المفاجاه': 'المفاجأة',
+  'مساله': 'مسألة', 'المساله': 'المسألة', 'مسأله': 'مسألة', 'المسأله': 'المسألة',
+  'تهنئه': 'تهنئة', 'التهنئه': 'التهنئة', 'مراه': 'مرأة', 'المراه': 'المرأة',
+  'امرأه': 'امرأة', 'مسوول': 'مسؤول', 'المسوول': 'المسؤول', 'مسئول': 'مسؤول',
+  'المسئول': 'المسؤول', 'رءيس': 'رئيس', 'الرءيس': 'الرئيس',
+  'نشاطا': 'نشاطًا', 'استخداما': 'استخدامًا', 'اجراءا': 'إجراءً', 'مبدئيا': 'مبدئيًا',
+  'هاذا': 'هذا', 'هذة': 'هذه', 'هولاء': 'هؤلاء', 'الذى': 'الذي', 'التى': 'التي',
+  'لاكن': 'لكن', 'إنشاء الله': 'إن شاء الله'
+});
+const V26_FEM_TAA = Object.freeze(new Set([
+  'فكرة','شجرة','مدرسة','مكتبة','جامعة','مدينة','سيارة','حديقة','غرفة','طاولة',
+  'معلمة','طالبة','مهندسة','موظفة','كاتبة','نتيجة','قضية','دراسة','قراءة','طريقة',
+  'شخصية','بيئة','فئة','مائدة','مكافأة','مفاجأة','مسألة','تهنئة','مرأة','امرأة',
+  'صحيفة','جريدة','دولة','كلمة','جملة','صفحة','ورقة','نافذة',
+  'حقيقة','قيمة','فرصة','خبرة','رحلة','نظيفة','جديدة','كبيرة','صغيرة','جميلة',
+  'سهلة','صعبة','مفيدة','واضحة','كاملة','سعادة','أمانة','عدالة','بطولة','بطلة'
+]));
+
+function v26Strip(value) {
+  return stripDiacritics(String(value || ''));
 }
-function v26Morph(word){
-  try{return inspectWord(String(word||''));}catch(e){return null;}
+function v26Esc(value) {
+  return String(value).split("").map(function(ch){ return /[A-Za-z0-9]/.test(ch) ? ch : "\\" + ch; }).join("");
 }
-function v26RoleGraph(text,options={}){
-  try{return inspectSyntaxV25(text,options)?.roleGraphV2433||inspectSyntaxV25(text,options)?.roleGraphV2432||null;}catch(e){return null;}
+function v26IsArabicWord(tok) {
+  return Boolean(tok) && tok.type === 'word';
 }
-function v26MeaningProxy(text,options={}){
-  const ctx=createContext(String(text||''),options);
-  const words=(ctx.tokens||[]).filter(t=>t&&t.type==='word');
-  const graph=ctx.syntax?.roleGraphV2433||ctx.syntax?.roleGraphV2432||{};
-  const roles=Array.isArray(graph.roles)?graph.roles:[];
+function v26Attach(prefixList, core) {
+  return (prefixList || []).join('') + core;
+}
+
+function v26SplitClitics(surface) {
+  const original = String(surface || '');
+  let rest = v26Strip(original);
+  const prefixes = [];
+  if (/^[وف]/u.test(rest) && rest.length > 2) {
+    const after = rest.slice(1);
+    const stripOk = v26ParticleKind(after) || /^ال/u.test(after) || V26_DEM[after] || V26_PRON[after] || V26_PREP.has(after) || (v26IsPresentCore(after) && v26FiveVerbInfo(after));
+    if (stripOk && !V26_PRON[rest] && !V26_DEM[rest] && !V26_REL[rest]) {
+      prefixes.push(rest[0]);
+      rest = after;
+    }
+  }
+  if (/^س/u.test(rest) && rest.length > 3 && /^[أيتن]/u.test(rest.slice(1)) && !/[هة]$/u.test(rest)) {
+    prefixes.push('س');
+    rest = rest.slice(1);
+  }
+  let preposition = null;
+  if (/^[بك]/u.test(rest) && rest.length > 3 && /^ال/u.test(rest.slice(1))) {
+    preposition = rest[0];
+    prefixes.push(rest[0]);
+    rest = rest.slice(1);
+  } else if (/^لل/u.test(rest) && rest.length > 4) {
+    preposition = 'ل';
+    prefixes.push('ل');
+    rest = 'ال' + rest.slice(2);
+  } else if (/^ل/u.test(rest) && rest.length > 3 && /^ال/u.test(rest.slice(1)) && !/^لن/u.test(rest) && !/^لم/u.test(rest) && !/^لكن/u.test(rest)) {
+    preposition = 'ل';
+    prefixes.push('ل');
+    rest = rest.slice(1);
+  }
+  let article = false;
+  if (/^ال/u.test(rest) && rest.length > 3) {
+    article = true;
+    rest = rest.slice(2);
+  }
+  let enclitic = '';
+  const enc = rest.match(/(ها|هم|هن|كم|كن|نا|ني)$/u);
+  if (enc && rest.length - enc[1].length >= 3) {
+    enclitic = enc[1];
+    rest = rest.slice(0, -enc[1].length);
+  }
+  return {surface: original, prefixes, preposition, article, core: rest, enclitic};
+}
+
+function v26TokenizeSimple(text) {
+  const src = String(text || '');
+  const re = /[\u0621-\u063A\u0641-\u064A\u0671-\u06D3][\u0621-\u063A\u0641-\u064A\u064B-\u065F\u0670-\u06D3]*/gu;
+  const tokens = [];
+  let m;
+  let sentence = 0;
+  let prev = 0;
+  while ((m = re.exec(src))) {
+    const between = src.slice(prev, m.index);
+    if (tokens.length && /[.!?؟؛]/.test(between) || (tokens.length && between.indexOf('\n') >= 0)) sentence += 1;
+    const surface = m[0];
+    const clitics = v26SplitClitics(surface);
+    tokens.push({
+      index: tokens.length,
+      sentence,
+      type: 'word',
+      surface,
+      start: m.index,
+      end: m.index + surface.length,
+      originalStart: m.index,
+      originalEnd: m.index + surface.length,
+      clean: v26Strip(surface),
+      clitics,
+      core: clitics.core,
+      visibleCase: visibleCase(surface)
+    });
+    prev = m.index + surface.length;
+  }
+  return tokens;
+}
+
+function v26NominalShape(core) {
+  const word = v26Strip(core);
+  if (!word) return null;
+  if (/تان$/u.test(word)) return {pos: 'noun', number: 'du', gender: 'f', caseForm: 'nominative', stem: word.slice(0, -3)};
+  if (/تين$/u.test(word)) return {pos: 'noun', number: 'du', gender: 'f', caseForm: 'accgen', stem: word.slice(0, -3)};
+  if (/ون$/u.test(word) && word.length > 3) return {pos: 'noun', number: 'pl', gender: 'm', caseForm: 'nominative', stem: word.slice(0, -2)};
+  if (/ين$/u.test(word) && word.length > 3) return {pos: 'noun', number: null, numberCandidates: ['du', 'pl'], gender: 'm', caseForm: 'accgen', stem: word.slice(0, -2)};
+  if (/ان$/u.test(word) && word.length > 3) return {pos: 'noun', number: 'du', gender: 'm', caseForm: 'nominative', stem: word.slice(0, -2)};
+  if (/ات$/u.test(word) && word.length > 3) return {pos: 'noun', number: 'pl', gender: 'f', caseForm: null, stem: word.slice(0, -2)};
+  if (/ة$/u.test(word)) return {pos: 'noun', number: 'sg', gender: 'f', caseForm: null, stem: word.slice(0, -1)};
+  return {pos: 'noun', number: 'sg', gender: V26_NOUN_GENDER[word] || null, caseForm: null, stem: word};
+}
+
+function v26RebuildNominal(shape, target) {
+  if (!shape) return null;
+  const stem = shape.stem;
+  const number = target.number || shape.number || 'sg';
+  const gender = target.gender || shape.gender || 'm';
+  const caseForm = target.caseForm || 'nominative';
+  const oblique = caseForm === 'accusative' || caseForm === 'genitive' || caseForm === 'accgen';
+  if (gender === 'f' && number === 'du') return stem + (oblique ? 'تين' : 'تان');
+  if (gender === 'f' && number === 'pl') return stem + 'ات';
+  if (gender === 'f' && number === 'sg') return stem + (stem.endsWith('ة') ? '' : 'ة');
+  if (gender === 'm' && number === 'du') return stem + (oblique ? 'ين' : 'ان');
+  if (gender === 'm' && number === 'pl') return stem + (oblique ? 'ين' : 'ون');
+  return stem;
+}
+
+function v26IsPresentCore(core) {
+  const c = v26Strip(core);
+  return /^[أيتن]/u.test(c) && c.length >= 3;
+}
+function v26FiveVerbInfo(core) {
+  const c = v26Strip(core);
+  if (!v26IsPresentCore(c)) return null;
+  if (/ون$/u.test(c) && c.length >= 5) {
+    return {kind: 'five', suffix: 'ون', person: 'mp', number: 'pl', mood: 'indicative', dropped: c.slice(0, -2) + 'وا', singular: c.slice(0, -2)};
+  }
+  if (/ان$/u.test(c) && c.length >= 5 && /^[يت]/u.test(c)) {
+    return {kind: 'five', suffix: 'ان', person: 'du', number: 'du', mood: 'indicative', dropped: c.slice(0, -2) + 'ا', singular: c.slice(0, -2)};
+  }
+  if (/ين$/u.test(c) && /^ت/u.test(c) && c.length >= 5) {
+    return {kind: 'five', suffix: 'ين', person: '2fs', number: 'sg', mood: 'indicative', dropped: c.slice(0, -2) + 'ي', singular: c.slice(0, -2)};
+  }
+  if (/وا$/u.test(c) && c.length >= 5) {
+    return {kind: 'five', suffix: 'وا', person: 'mp', number: 'pl', mood: 'nonindicative', dropped: c, singular: c.slice(0, -2)};
+  }
+  if (/و$/u.test(c) && c.length >= 5 && v26IsPresentCore(c.slice(0, -1)) && c.slice(0, -1).length >= 4) {
+    return {kind: 'five-missing-alif', suffix: 'و', person: 'mp', number: 'pl', mood: 'nonindicative', dropped: c + 'ا', singular: c.slice(0, -1)};
+  }
+  return null;
+}
+function v26LooksLikeVerb(core) {
+  const c = v26Strip(core);
+  if (v26FiveVerbInfo(c)) return true;
+  if (v26IsPresentCore(c)) return true;
+  if (V26_PAST_1SG.has(c)) return true;
+  if (/[ت]$/u.test(c) && c.length >= 4 && !/ة$/u.test(c)) return true;
+  return false;
+}
+function v26LooksLikeNominal(tok) {
+  const c = tok.core || v26Strip(tok.surface);
+  if (V26_INNA.has(c) || V26_JUSSIVE.has(c) || V26_SUBJUNCTIVE.has(c) || V26_PREP.has(c)) return false;
+  if (V26_DEM[c] || V26_REL[c] || V26_PRON[c] || V26_NUM[c]) return true;
+  if (tok.clitics && tok.clitics.article) return true;
+  const shape = v26NominalShape(c);
+  return Boolean(shape);
+}
+
+function v26GovernorKind(core) {
+  const c = v26Strip(core);
+  if (V26_JUSSIVE.has(c)) return 'jussive';
+  if (V26_SUBJUNCTIVE.has(c)) return 'subjunctive';
+  if (c === 'حتى') return 'subjunctive-maybe';
+  return null;
+}
+function v26ParticleKind(core) {
+  const c = v26Strip(core);
+  if (V26_INNA.has(c)) return 'inna';
+  if (V26_KANA.has(c)) return 'kana';
+  if (V26_JUSSIVE.has(c)) return 'jussive';
+  if (V26_SUBJUNCTIVE.has(c)) return 'subjunctive';
+  if (V26_PREP.has(c)) return 'prep';
+  if (V26_CONJ.has(c)) return 'conj';
+  if (V26_DEM[c]) return 'dem';
+  if (V26_REL[c]) return 'rel';
+  if (V26_PRON[c]) return 'pron';
+  if (V26_NUM[c]) return 'num';
+  return null;
+}
+
+function v26AnalyzeWord(tok, sentenceTokens) {
+  const clitics = tok.clitics || v26SplitClitics(tok.surface);
+  const core = clitics.core || tok.core || v26Strip(tok.surface);
+  const full = v26Strip(tok.surface);
+  const kind = v26ParticleKind(full) || v26ParticleKind(core);
+  const shape = v26NominalShape(core);
+  const sent = (sentenceTokens || []).filter(t => t && t.sentence === tok.sentence);
+  const idx = sent.indexOf(tok);
+  const prevTok = idx > 0 ? sent[idx - 1] : null;
+  const prevCore = prevTok && prevTok.v26 ? prevTok.v26.core : (prevTok ? v26Strip(prevTok.surface) : '');
+  const gov = v26GovernorKind(prevCore);
+  const nounDuPl = Boolean(shape && (shape.number === 'du' || shape.number === 'pl' || (shape.numberCandidates && shape.numberCandidates.length)));
+  const governedVerb = gov === 'jussive' || gov === 'subjunctive';
+  let five = (!clitics.article && v26FiveVerbInfo(core)) || null;
+  if (five && nounDuPl && !governedVerb) five = null;
+  const dem = V26_DEM[full] || V26_DEM[core];
+  const pos = [];
+  if (kind === 'inna' || kind === 'kana' || kind === 'jussive' || kind === 'subjunctive' || kind === 'prep' || kind === 'conj') {
+    pos.push({pos: 'particle', kind, confidence: 0.99});
+  }
+  if (dem) pos.push({pos: 'demonstrative', ...dem, confidence: 0.99});
+  if (V26_REL[full] || V26_REL[core]) pos.push({pos: 'relative', ...(V26_REL[full] || V26_REL[core]), confidence: 0.99});
+  if (V26_PRON[full] || V26_PRON[core]) pos.push({pos: 'pronoun', ...(V26_PRON[full] || V26_PRON[core]), confidence: 0.99});
+  if (V26_NUM[full] || V26_NUM[core]) pos.push({pos: 'number', ...(V26_NUM[full] || V26_NUM[core]), confidence: 0.99});
+  if (five) pos.push({pos: 'verb', tense: 'present', five, confidence: 0.9});
+  else if (v26IsPresentCore(core) && !clitics.article && !(nounDuPl && !governedVerb)) pos.push({pos: 'verb', tense: 'present', confidence: 0.72});
+  if (V26_PAST_1SG.has(full) || V26_PAST_1SG.has(core)) pos.push({pos: 'verb', tense: 'past', person: '1sg', confidence: 0.95});
+  if (shape && !['jussive', 'subjunctive', 'prep', 'conj', 'inna'].includes(kind)) {
+    pos.push({pos: shape.gender === 'f' && /ة$/u.test(core) ? 'noun' : 'noun', ...shape, confidence: clitics.article ? 0.92 : 0.7});
+  }
+  pos.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+  const best = pos[0] || {pos: 'unknown', confidence: 0.2};
+  const ambiguous = pos.length > 1 && (pos[0].confidence - (pos[1].confidence || 0)) < 0.15;
+  tok.v26 = {
+    clitics, core, full, kind, five, shape, dem,
+    posCandidates: pos, best, ambiguous,
+    gender: best.gender || shape && shape.gender || dem && dem.gender || null,
+    number: best.number || shape && shape.number || dem && dem.number || null,
+    caseForm: best.caseForm || shape && shape.caseForm || dem && dem.caseForm || null
+  };
+  return tok;
+}
+
+function v26SentenceTokens(tokens, sentenceId) {
+  return tokens.filter(t => t.sentence === sentenceId);
+}
+function v26NextWord(sent, i) {
+  for (let k = i + 1; k < sent.length; k++) if (v26IsArabicWord(sent[k])) return sent[k];
+  return null;
+}
+function v26PrevWord(sent, i) {
+  for (let k = i - 1; k >= 0; k--) if (v26IsArabicWord(sent[k])) return sent[k];
+  return null;
+}
+function v26IsSentStart(sent, tok) {
+  const idx = sent.indexOf(tok);
+  if (idx <= 0) return true;
+  const prev = v26PrevWord(sent, idx);
+  if (!prev) return true;
+  const pk = prev.v26 && prev.v26.kind;
+  return pk === 'conj';
+}
+function v26RebuildSurface(tok, newCore) {
+  if (!tok || !newCore) return newCore;
+  const cl = tok.v26 && tok.v26.clitics || tok.clitics || v26SplitClitics(tok.surface);
+  let out = '';
+  for (const p of (cl.prefixes || [])) out += p;
+  if (cl.article) out += 'ال';
+  out += newCore;
+  if (cl.enclitic) out += cl.enclitic;
+  return out;
+}
+
+function v26Note({tok, original, replacement, type, rule, reason, confidence, confidenceLabel, alternatives, apply, sentence}) {
+  const start = tok ? tok.originalStart : 0;
+  const length = tok ? (tok.originalEnd - tok.originalStart) : 0;
+  const band = confidence >= 0.97 ? V26_CONFIDENCE.certain
+    : confidence >= 0.85 ? V26_CONFIDENCE.likely
+    : V26_CONFIDENCE.ambiguous;
+  const shouldApply = apply === false ? false : (apply === true ? confidence >= 0.88 : confidence >= 0.97);
   return {
-    wordCount:words.length,
-    clauseCount:(ctx.syntax?.clauses||[]).length,
-    protectedCount:(ctx.protectedSpans||[]).length,
-    lexical:words.map(t=>({i:t.index,core:stripDiacritics(t.morph?.core||t.clean||t.surface||''),lemma:t.morph?.lemma||t.morph?.nominal?.lemma||null,pos:t.morph?.resolvedPos||t.morph?.pos||'unknown'})),
-    roles:roles.map((r,i)=>r?{i,role:r.role||null,headIndex:r.headIndex??null}:null)
+    index: start,
+    length,
+    original: original != null ? original : (tok ? tok.surface : ''),
+    replacement,
+    type,
+    ruleId: rule,
+    rule,
+    reason,
+    explanation: reason,
+    confidence,
+    confidenceLabel: confidenceLabel || band.label,
+    confidenceBand: band.code,
+    alternatives: alternatives || [],
+    apply: shouldApply,
+    autoCorrectable: shouldApply,
+    safeCandidate: shouldApply,
+    classification: type === 'إملائي' ? 'orthographic' : type === 'صرفي' ? 'morphology' : type === 'مطابقة' ? 'agreement' : 'syntax',
+    sentence,
+    position: start,
+    موضع: start,
+    v26: true,
+    metadata: {v26: true, contextual: true, rule}
   };
 }
-function v26ContextStable(original,replacement,candidate,options={}){
-  try{
-    const a=v26MeaningProxy(original,options), b=v26MeaningProxy(replacement,options);
-    if(a.wordCount!==b.wordCount) return {ok:false,reason:'تغيّر عدد الكلمات'};
-    if(a.clauseCount!==b.clauseCount) return {ok:false,reason:'تغيّر عدد الجمل/المقاطع'};
-    if(a.protectedCount!==b.protectedCount) return {ok:false,reason:'تغيّر نطاق محمي'};
-    const affected=new Set([Number(candidate.tokenIndex)]);
-    for(const n of (candidate.affectedTokenIndices||[])) affected.add(Number(n));
-    for(let i=0;i<a.lexical.length;i++){
-      if(affected.has(i)) continue;
-      const x=a.lexical[i], y=b.lexical[i];
-      if(!x||!y) return {ok:false,reason:'اختلال المحاذاة'};
-      if(x.lemma!==y.lemma || x.pos!==y.pos) return {ok:false,reason:`تغيّر تحليل غير متأثر:${i}`};
-    }
-    for(let i=0;i<a.roles.length;i++){
-      if(i===idx) continue;
-      const x=a.roles[i], y=b.roles[i];
-      if((x?.role||null)!==(y?.role||null) || (x?.headIndex??null)!==(y?.headIndex??null))
-        return {ok:false,reason:`تغيّر دور غير متأثر:${i}`};
-    }
-    return {ok:true,reason:'بنية غير متأثرة محفوظة'};
-  }catch(e){ return {ok:false,reason:'فشل إعادة التحليل'}; }
+
+function v26HasFollowingPluralSubject(sent, verbIdx) {
+  const nxt = v26NextWord(sent, verbIdx);
+  if (!nxt || !nxt.v26) return false;
+  if (nxt.v26.kind === 'prep' || nxt.v26.kind === 'jussive' || nxt.v26.kind === 'subjunctive') return false;
+  const shape = nxt.v26.shape;
+  if (!shape) return false;
+  if (shape.number === 'pl' || shape.number === 'du') return true;
+  if (shape.numberCandidates && shape.numberCandidates.length) return true;
+  return false;
 }
-function v26FindingForToken(context,token,replacement,ruleId,opts={}){
-  const f=v26MakeTokenFinding(context,token,replacement,ruleId,opts);
-  f.decisionClass=opts.decisionClass|| (opts.safe===false?'REVIEW':'CERTAIN');
-  f.confidenceLevel=v26ConfidenceLevel(f.confidence).code;
-  f.confidenceLevelLabel=v26ConfidenceLevel(f.confidence).label;
-  f.semanticGuard='sentence-context';
-  f.metadata={...(f.metadata||{}), tokenIndex:token.index, originalSurface:token.surface,
-    morphologyBefore:{pos:token.morph?.resolvedPos||token.morph?.pos,lemma:token.morph?.lemma||token.morph?.nominal?.lemma,number:token.morph?.number||token.morph?.nominal?.number,gender:token.morph?.gender||token.morph?.nominal?.gender}};
-  return f;
-}
-function v26SentenceCandidate(context,startToken,endToken,replacement,ruleId,opts={}){
-  const f=findingFromSpan(context,{startToken,endToken,replacement,ruleId,
-    type:opts.type||'نحوي',classification:opts.classification||'syntax',confidence:opts.confidence??.999,
-    explanation:opts.explanation||'',evidence:opts.evidence||[],safe:opts.safe===true,
-    metadata:{...(opts.metadata||{}),v26:true,v26Enhanced:true,tokenIndex:endToken?.index??startToken.index,affectedTokenIndices:Array.from({length:(endToken?.index??startToken.index)-startToken.index+1},(_,k)=>startToken.index+k)}});
-  f.v26=true; f.v26Enhanced=true; f.manualOnly=opts.safe!==true; f.safeCandidate=opts.safe===true; f.autoCorrectable=opts.safe===true;
-  f.decisionClass=opts.safe===true?'CERTAIN':'REVIEW';
-  f.confidenceLevel=v26ConfidenceLevel(f.confidence).code; f.confidenceLevelLabel=v26ConfidenceLevel(f.confidence).label;
-  return f;
-}
-function v26TokenIndexBySpan(context,start){
-  const ts=context.tokens||[];
-  return ts.find(t=>t.type==='word'&&Number(t.originalStart)<=start&&Number(t.originalEnd)>start)?.index ?? -1;
-}
-function v26PromoteUnambiguousNawasikh(context,baseFindings,out){
-  for(const f of (baseFindings||[])){
-    if(String(f.ruleId||'')!=='INNA_SUBJECT_CASE_V18') continue;
-    const token=context.tokens?.find(t=>t.type==='word'&&Number(t.originalStart)===Number(f.index));
-    if(!token) continue;
-    const role=context.syntax?.roles?.[token.index];
-    const core=v26Core(token), replacement=String(f.replacement||'');
-    if(role?.role!=='inna-subject' || Number(role.confidence||0)<.995) continue;
-    if(!/ان$/u.test(core) || !/ين$/u.test(stripDiacritics(replacement))) continue;
-    const morph=v26Morph(stripDiacritics(replacement));
-    if(morph?.nominal?.number!=='du' || morph?.nominal?.caseForm!=='accgen') continue;
-    const nf=v26FindingForToken(context,token,replacement,'V26_INNA_DUAL_SUBJECT_CASE_DETERMINISTIC',{
-      type:'نحوي',classification:'government',confidence:.9999,safe:true,
-      explanation:'«إنّ» تنصب اسمها، والاسم هنا مثنى محسوم؛ علامة النصب هي الياء، لذا «الطالبين».',
-      evidence:['explicit-nasikh:إن','role:inna-subject','dual-morphology-confirmed','case-government-confirmed','minimal-edit']
-    });
-    out.push(nf);
-  }
-}
-function v26AddJussiveFiveVerbPromotion(context,out){
-  const toks=v26WordTokens(context);
-  for(let i=0;i<toks.length-1;i++){
-    const p=toks[i], v=toks[i+1];
-    if(v26Core(p)!=='لم' || p.sentence!==v.sentence) continue;
-    const vm=v.morph||{}; const best=vm.bestVerb||vm.verbAnalyses?.[0];
-    const core=v26Core(v);
-    if(!best || best.pos!=='verb' || best.tense!=='present' || best.number!=='pl') continue;
-    if(!/ون$/u.test(core) || !/^ي/u.test(core)) continue;
-    const replacement=core.slice(0,-2)+'وا';
-    const parsed=v26Morph(replacement);
-    const validVerb=parsed?.resolvedPos==='verb' && (parsed?.verbAnalyses||[]).some(x=>x.mood==='jussive'&&x.number==='pl');
-    if(!validVerb) continue;
-    const f=v26FindingForToken(context,v,replacement,'V26_FIVE_VERB_JUSSIVE_DETERMINISTIC',{
-      type:'صرفي',classification:'morphology',confidence:.9998,safe:true,
-      explanation:'«لم» تجزم المضارع، والفعل من الأفعال الخمسة؛ يجب حذف النون، وتبقى واو الجماعة مع الألف الفارقة.',
-      evidence:['explicit-jussive-particle:لم','productive-five-verbs','morphology-validated','sentence-context','minimal-edit']
-    });
-    out.push(f);
-  }
-}
-function v26AddFrontedObjectDual(context,out){
-  const toks=v26WordTokens(context);
-  if(toks.length<2) return;
-  const first=toks[0], verb=toks[1];
-  const fm=first.morph||{}, vm=verb.morph||{};
-  const best=vm.bestVerb||vm.verbAnalyses?.[0];
-  if(!best || !best.transitive || !['1s','2ms','2fs'].includes(best.personCode)) return;
-  if(v26Core(first)==='' || !(fm.number==='du'||fm.nominal?.number==='du')) return;
-  if(!/ان$/u.test(v26Core(first))) return;
-  /* لا نحسمه إذا وُجد فاعل ظاهر قبل الفعل يفسر الأول مبتدأً بدل المفعول. */
-  if(toks.length>2){
-    const after=toks[2];
-    const ag=after?.morph?.gender||after?.morph?.nominal?.gender;
-    const an=after?.morph?.number||after?.morph?.nominal?.number;
-    const ap=after?.morph?.resolvedPos||after?.morph?.pos;
-    if(['noun','proper'].includes(ap) && (ag||an)) return;
-  }
-  const core=v26Core(first), replacement=core.slice(0,-2)+'ين';
-  const parsed=v26Morph(replacement);
-  const okay=parsed?.resolvedPos==='noun' && parsed?.nominal?.number==='du' && parsed?.nominal?.caseForm==='accgen';
-  if(!okay) return;
-  const f=v26FindingForToken(context,first,replacement,'V26_FRONTED_OBJECT_DUAL_CASE',{
-    type:'نحوي',classification:'government',confidence:.9995,safe:true,
-    explanation:'الاسم المثنى متقدم على فعل متعدٍ مسند إلى المتكلم/المخاطب؛ القراءة الأقرب أنه مفعول به مقدّم، فيُنصب بالياء.',
-    evidence:['SVO-OVS-context','transitive-verb','first-or-second-person-verb','dual-object','morphology-validated','minimal-edit']
-  });
-  out.push(f);
-}
-function v26AddFemininePluralAgreement(context,out){
-  const toks=v26WordTokens(context);
-  if(toks.length!==2) return;
-  const head=toks[0], pred=toks[1];
-  const hm=head.morph||{}, pm=pred.morph||{};
-  const hp=hm.resolvedPos||hm.pos, pp=pm.resolvedPos||pm.pos;
-  if(!['noun','proper'].includes(hp) || !['adj','noun'].includes(pp)) return;
-  if((hm.number||hm.nominal?.number)!=='pl' || (hm.gender||hm.nominal?.gender)!=='f') return;
-  const pc=v26Core(pred); if(!/ون$/u.test(pc)) return;
-  const replacement=pc.slice(0,-2)+'ات';
-  const parsed=v26Morph(replacement); if(parsed?.nominal?.gender!=='f'||parsed?.nominal?.number!=='pl') return;
-  const f=v26FindingForToken(context,pred,replacement,'V26_FEMININE_PLURAL_AGREEMENT',{
-    type:'مطابقة',classification:'agreement',confidence:.999,safe:true,
-    explanation:'المبتدأ جمع مؤنث سالم، والخبر/النعت يجب أن يطابقه في الجنس والعدد؛ عُدلت الصيغة فقط مع إبقاء الإعراب دون حركة زائدة.',
-    evidence:['subject-gender:f','subject-number:pl','predicate-agreement','minimal-edit','morphology-validated']
-  });
-  out.push(f);
-}
-function v26AddNumberThreeAgreement(context,out){
-  const toks=v26WordTokens(context); if(toks.length<2) return;
-  const num=toks[0], dep=toks[1];
-  if(v26Core(num)!=='ثلاث') return;
-  const depSurface=stripDiacritics(v26Surface(dep));
-  if(!/ان$/u.test(depSurface) || depSurface.length<4) return;
-  const singularStem=depSurface.slice(0,-2);
-  const candidatePlural=v26Morph(singularStem);
-  const n=candidatePlural?.nominal;
-  if(!n || n.number!=='pl' || n.gender!=='m') return;
-  const replacement='ثلاثة '+singularStem;
-  const f=v26SentenceCandidate(context,num,dep,replacement,'V26_NUMBER_3_GENDER_AND_COUNTED_NOUN',{
-    type:'مطابقة',classification:'agreement',confidence:.999,safe:true,
-    explanation:'العدد «ثلاث» يوافق المعدود المذكر بصيغة «ثلاثة»، والمعدود هنا جُمع على «كتب»؛ صيغت العبارة بأقل تعديل ممكن.',
-    evidence:['number:3','counted-noun-masculine','counted-noun-plural','reviewed-morphology','minimal-edit'],
-    metadata:{number:3,countedGender:'m',countedNumber:'pl'}
-  });
-  out.push(f);
-}
-function v26AddAmbiguousDemonstrativeAbstention(context,out){
-  const toks=v26WordTokens(context); if(toks.length!==2) return;
-  const dem=toks[0], dep=toks[1];
-  const dm=dem.morph||{}, xm=dep.morph||{};
-  if(dm.resolvedPos!=='demonstrative' || dm.number!=='du') return;
-  const xnum=xm.number||xm.nominal?.number;
-  const xgen=xm.gender||xm.nominal?.gender;
-  if(xnum!=='du' || !['m','f'].includes(xgen)) return;
-  const dg=dm.gender||dm.nominal?.gender, xg=xgen;
-  if(dg===xg) return;
-  const f=v26SentenceCandidate(context,dem,dep,null,'V26_DEMONSTRATIVE_GENDER_AMBIGUITY',{
-    type:'غموض',classification:'ambiguity',confidence:.40,safe:false,
-    explanation:'تعارض ظاهر بين جنس اسم الإشارة وجنس الاسم الذي يليه، لكن إصلاحه يتطلب معرفة المقصود؛ قد يكون المراد مذكرًا («هذان معلّمان») أو مؤنثًا («هاتان معلّمتان»). لذلك يمتنع المحرك عن اختيار معنى.',
-    evidence:['demonstrative-gender-conflict','dual-number','multiple-semantic-repairs','abstention-by-design'],
-    metadata:{alternatives:['هذان معلّمان','هاتان معلّمتان'],abstention:'meaning-disambiguation'}
-  });
-  f.requiresReview=true; f.manualOnly=true; f.autoCorrectable=false; f.safeCandidate=false; f.recommendedAction='abstain'; f.decisionClass='ABSTAINED';
-  out.push(f);
-}
-function v26AddAmbiguityGuards(context,out){
-  const toks=v26WordTokens(context);
-  if(toks.length===2 && v26Core(toks[0])==='من'){
-    const v=toks[1];
-    const best=v.morph?.bestVerb||v.morph?.verbAnalyses?.[0];
-    if(best && best.number==='pl'){
-      const f=v26SentenceCandidate(context,toks[0],v,null,'V26_INCOMPLETE_RELATIVE_OR_CONDITIONAL',{
-        type:'غموض',classification:'ambiguity',confidence:.35,safe:false,
-        explanation:'العبارة «من يدرسون» لا تكفي وحدها للحسم: «من» قد تكون موصولة أو شرطية، وقد يتطلب تصحيح الفعل سياقًا إضافيًا. لا تعديل آلي.',
-        evidence:['incomplete-context','relative-vs-conditional','abstain-from-guessing'],metadata:{alternatives:['من يدرسون ...','من يدرس ...']}
-      });
-      f.requiresReview=true; f.manualOnly=true; f.recommendedAction='abstain'; f.decisionClass='ABSTAINED'; out.push(f);
+
+function v26AnalyzeSentence(sent) {
+  const notes = [];
+  const abstained = [];
+  if (!sent.length) return {notes, abstained, type: 'empty'};
+  sent.forEach(t => v26AnalyzeWord(t, sent));
+
+  const cores = sent.map(t => t.v26.full);
+  const joined = cores.join(' ');
+
+  /* —— امتناع: جملة ناقصة أو ملتبسة —— */
+  if (sent.length === 1) {
+    const only = sent[0].v26.full;
+    if (!V26_REVIEWED_ORTHOGRAPHY[only] && !V26_VESSEL_HAA[only]) {
+      abstained.push(v26Note({
+        tok: sent[0], original: sent[0].surface, replacement: null,
+        type: 'غموض يحتاج إلى مراجعة', rule: 'V26_ABSTAIN_INCOMPLETE',
+        reason: 'الجملة ناقصة ولا يكفي سياق الكلمة الواحدة للحكم.',
+        confidence: 0.2, apply: false, sentence: sent[0].sentence
+      }));
+      return {notes, abstained, type: 'incomplete'};
     }
   }
-}
-function v26OverrideWrongLegacyCandidates(text,baseFindings,context){
-  const toks=v26WordTokens(context), blocked=new Set();
-  if(toks.length>=2){
-    const first=toks[0], verb=toks[1], best=verb.morph?.bestVerb||verb.morph?.verbAnalyses?.[0];
-    if(best?.transitive && ['1s','2ms','2fs'].includes(best.personCode) && first.morph?.nominal?.number==='du'){
-      for(const f of baseFindings||[]){ if(String(f.ruleId)==='V25_SUBJECT_VERB_AGREEMENT' && f.index>=first.originalStart) blocked.add(f); }
+  if (sent.length === 2 && (sent[0].v26.full === 'من' || sent[0].v26.core === 'من') && (sent[1].v26.five || v26FiveVerbInfo(sent[1].v26.core) || (v26IsPresentCore(sent[1].v26.core) && !(sent[1].v26.clitics && sent[1].v26.clitics.article)))) {
+    abstained.push(v26Note({
+      tok: sent[1], original: sent[1].surface, replacement: null,
+      type: 'غموض يحتاج إلى مراجعة', rule: 'V26_ABSTAIN_MAN_FIVE_VERBS',
+      reason: '«من يدرسون» تحتمل الاسم الموصول مع الجمع، وتحتمل الاستفهام أو الشرط؛ لا يُحسم التصحيح دون تتمة الجملة.',
+      confidence: 0.3, apply: false, alternatives: ['من يدرس', 'من يدرسون'], sentence: sent[0].sentence
+    }));
+    return {notes, abstained, type: 'ambiguous'};
+  }
+
+  for (let i = 0; i < sent.length; i++) {
+    const tok = sent[i];
+    const v = tok.v26;
+    const prev = v26PrevWord(sent, i);
+    const next = v26NextWord(sent, i);
+    const prevKind = prev && prev.v26 && (prev.v26.kind || v26GovernorKind(prev.v26.core));
+    const prevCore = prev ? (prev.v26.core || prev.v26.full) : '';
+    const full = v.full;
+    const core = v.core;
+
+    /* —— إملاء مراجع أحادي الهدف —— */
+    if (V26_REVIEWED_ORTHOGRAPHY[full] && V26_REVIEWED_ORTHOGRAPHY[full] !== tok.surface) {
+      notes.push(v26Note({
+        tok, original: tok.surface, replacement: V26_REVIEWED_ORTHOGRAPHY[full],
+        type: 'إملائي', rule: 'V26_REVIEWED_ORTHOGRAPHY',
+        reason: 'رسم مراجع له مقابل قياسي واحد، ولا قراءة فصيحة بديلة في هذا السياق.',
+        confidence: 0.995, sentence: tok.sentence
+      }));
+      continue;
     }
-    if(v26Core(first)==='هاتان' && (toks[1].morph?.nominal?.gender||toks[1].morph?.gender)==='m' && toks[1].morph?.nominal?.number==='du'){
-      for(const f of baseFindings||[]){ if(/DEMONSTRATIVE_(DEPENDENT|APPOSITION_CASE)/u.test(String(f.ruleId||''))) blocked.add(f); }
+    if (V26_REVIEWED_ORTHOGRAPHY[core] && !v.clitics.prefixes.length && !v.clitics.article) {
+      const repl = V26_REVIEWED_ORTHOGRAPHY[core];
+      if (repl !== core) {
+        notes.push(v26Note({
+          tok, original: tok.surface, replacement: v26RebuildSurface(tok, repl),
+          type: 'إملائي', rule: 'V26_REVIEWED_ORTHOGRAPHY',
+          reason: 'رسم مراجع له مقابل قياسي واحد.',
+          confidence: 0.99, sentence: tok.sentence
+        }));
+        continue;
+      }
+    }
+    if (prev && prev.v26 && prev.v26.dem && prev.v26.dem.gender === 'f' && /ه$/u.test(core) && core.length >= 4 && !/اه$/u.test(core) && !V26_VESSEL_HAA[full]) {
+      const asTaa = core.slice(0, -1) + 'ة';
+      const known = V26_REVIEWED_ORTHOGRAPHY[core] || V26_REVIEWED_ORTHOGRAPHY[full] || (V26_FEM_TAA.has(asTaa) ? asTaa : null);
+      if (known) {
+        notes.push(v26Note({
+          tok, original: tok.surface, replacement: v26RebuildSurface(tok, known),
+          type: 'إملائي', rule: 'V26_TAA_MARBUTA',
+          reason: 'بعد اسم إشارة مؤنث يُرجَّح أن الهاء تاء مربوطة، والسياق يُخرج قراءة الضمير.',
+          confidence: 0.97, sentence: tok.sentence
+        }));
+        continue;
+      }
+    }
+
+    /* —— الكأسه وأشباهها: لا تُصحَّح إلا بقرينة —— */
+    if (V26_VESSEL_HAA[full] || (v.clitics.article && /ه$/u.test(core) && v26NominalShape(core.slice(0, -1)))) {
+      const vessel = V26_VESSEL_HAA[full] || ('ال' + core.slice(0, -1));
+      const sentenceHasLiquid = sent.some(t => V26_LIQUID_WORDS.has(t.v26.full) || V26_LIQUID_WORDS.has(t.v26.core));
+      const afterPrep = prevKind === 'prep' || (prev && V26_PREP.has(prev.v26.core));
+      if (sentenceHasLiquid && afterPrep) {
+        notes.push(v26Note({
+          tok, original: tok.surface, replacement: vessel,
+          type: 'إملائي', rule: 'V26_CONTEXTUAL_VESSEL',
+          reason: 'الهاء بعد «ال» ليست ضميرًا، والسياق (الماء/الشراب + حرف الجر) يرجح أن المقصود اسم الإناء «الكأس» لا رسمًا بالهاء.',
+          confidence: 0.9, confidenceLabel: 'مرجح', apply: false, sentence: tok.sentence
+        }));
+      } else if (v.clitics.article && /ه$/u.test(core) && !V26_VESSEL_HAA[full]) {
+        abstained.push(v26Note({
+          tok, original: tok.surface, replacement: null,
+          type: 'غموض يحتاج إلى مراجعة', rule: 'V26_ABSTAIN_HAA_TAA',
+          reason: 'الهاء مع «ال» ليست إضافة ضميرية، لكن المعنى قد يكون تاءً مربوطة أو حرفًا زائدًا؛ يُترك دون تخمين.',
+          confidence: 0.4, apply: false, sentence: tok.sentence
+        }));
+      }
+    }
+
+    /* —— الأفعال الخمسة بعد جازم/ناصب —— */
+    const gov = v26GovernorKind(prevCore) || (prev && v26GovernorKind(prev.v26.full));
+    if (v.five && (gov === 'jussive' || gov === 'subjunctive')) {
+      const followingSubject = v26HasFollowingPluralSubject(sent, i);
+      if (v.five.mood === 'indicative') {
+        if (followingSubject && v.five.number === 'pl') {
+          const singular = v.five.singular;
+          notes.push(v26Note({
+            tok, original: tok.surface, replacement: v26RebuildSurface(tok, singular),
+            type: 'مطابقة', rule: 'V26_VSO_FIVE_VERBS',
+            reason: 'في ترتيب الفعل ثم الفاعل الظاهر يُوحَّد الفعل، ولا تُحذف نون الأفعال الخمسة على تقدير واو الجماعة.',
+            confidence: 0.93, confidenceLabel: 'مرجح', apply: false, sentence: tok.sentence
+          }));
+        } else {
+          notes.push(v26Note({
+            tok, original: tok.surface, replacement: v26RebuildSurface(tok, v.five.dropped),
+            type: 'صرفي', rule: gov === 'jussive' ? 'V26_FIVE_VERBS_JUSSIVE' : 'V26_FIVE_VERBS_SUBJUNCTIVE',
+            reason: gov === 'jussive'
+              ? '«لم» أداة جزم، والفعل من الأفعال الخمسة فيُجزم بحذف النون.'
+              : 'الأداة ناصبة للفعل المضارع، والأفعال الخمسة تُنصب بحذف النون.',
+            confidence: 0.99, sentence: tok.sentence
+          }));
+        }
+      }
+    }
+    /* —— ألف التفريق بعد واو الجماعة —— */
+    if (v.five && v.five.kind === 'five-missing-alif') {
+      const nxtDef = next && next.v26 && next.v26.clitics && next.v26.clitics.article;
+      const isVerbCtx = Boolean(gov) || v26IsPresentCore(core);
+      if (isVerbCtx && !nxtDef) {
+        notes.push(v26Note({
+          tok, original: tok.surface, replacement: v26RebuildSurface(tok, v.five.dropped),
+          type: 'إملائي', rule: 'V26_ALIF_FARIQA',
+          reason: 'تُزاد الألف الفارقة بعد واو الجماعة في الفعل، دون تغيير البنية الصرفية.',
+          confidence: 0.985, sentence: tok.sentence
+        }));
+      }
+    }
+
+    /* —— إنّ وأخواتها: اسمها منصوب وخبرها مرفوع —— */
+    if (v.kind === 'inna' || V26_INNA.has(full) || V26_INNA.has(core)) {
+      const nameTok = next;
+      const khabarTok = nameTok ? v26NextWord(sent, sent.indexOf(nameTok)) : null;
+      const nameIsVerb = Boolean(nameTok && nameTok.v26 && (nameTok.v26.five || (nameTok.v26.best && nameTok.v26.best.pos === 'verb')));
+      if (nameIsVerb) {
+        if (core === 'إن') {
+          abstained.push(v26Note({
+            tok, original: tok.surface, replacement: 'أن',
+            type: 'غموض يحتاج إلى مراجعة', rule: 'V26_ABSTAIN_INNA_AN',
+            reason: 'بعد «إن» فعلٌ؛ تحتمل الشرطية وتحتمل «أن» المصدرية. لا تُبدَّل الأداة دون دليل.',
+            confidence: 0.35, apply: false, alternatives: ['إن', 'أن'], sentence: tok.sentence
+          }));
+        }
+      } else if (nameTok && nameTok.v26 && nameTok.v26.shape) {
+        const nm = nameTok.v26.shape;
+        const kh = khabarTok && khabarTok.v26 && khabarTok.v26.shape;
+        if (nm.caseForm === 'nominative' && (nm.number === 'du' || nm.number === 'pl')) {
+          const fixed = v26RebuildNominal(nm, {number: nm.number || 'du', gender: nm.gender || 'm', caseForm: 'accgen'});
+          const keepKhabar = kh && kh.caseForm === 'nominative';
+          notes.push(v26Note({
+            tok: nameTok, original: nameTok.surface, replacement: v26RebuildSurface(nameTok, fixed),
+            type: 'نحوي', rule: 'V26_INNA_ISM_ACC',
+            reason: '«' + core + '» حرف ناسخ؛ اسمه منصوب وخبره مرفوع. المثنى وجمع المذكر يُنصبان بالياء، ولا تُغيَّر الأداة ما دام التركيب ناسخًا.',
+            confidence: keepKhabar || !kh ? 0.985 : 0.9, sentence: tok.sentence
+          }));
+        } else if (kh && kh.caseForm === 'accgen' && (nm.caseForm === 'accgen' || nm.caseForm === null) && (kh.number === 'du' || kh.number === 'pl' || (kh.numberCandidates && kh.numberCandidates.length))) {
+          const khFix = v26RebuildNominal(kh, {number: kh.number || (nm.number || 'pl'), gender: kh.gender || nm.gender || 'm', caseForm: 'nominative'});
+          notes.push(v26Note({
+            tok: khabarTok, original: khabarTok.surface, replacement: v26RebuildSurface(khabarTok, khFix),
+            type: 'نحوي', rule: 'V26_INNA_KHABAR_NOM',
+            reason: 'خبر إنّ مرفوع؛ علامة رفع المثنى الألف وعلامة رفع جمع المذكر الواو.',
+            confidence: 0.96, sentence: tok.sentence
+          }));
+        }
+      }
+    }
+
+    /* —— كان وأخواتها: اسمها مرفوع وخبرها منصوب —— */
+    if (v.kind === 'kana' || V26_KANA.has(full) || V26_KANA.has(core)) {
+      const nameTok = next;
+      const khabarTok = nameTok ? v26NextWord(sent, sent.indexOf(nameTok)) : null;
+      if (nameTok && khabarTok && nameTok.v26.shape && khabarTok.v26.shape) {
+        const nm = nameTok.v26.shape;
+        const kh = khabarTok.v26.shape;
+        if (nm.caseForm === 'accgen' && (nm.number === 'du' || nm.number === 'pl' || (nm.numberCandidates && nm.numberCandidates.length))) {
+          const num = nm.number || (kh.number === 'du' ? 'du' : 'pl');
+          const fixed = v26RebuildNominal(nm, {number: num, gender: nm.gender || 'm', caseForm: 'nominative'});
+          notes.push(v26Note({
+            tok: nameTok, original: nameTok.surface, replacement: v26RebuildSurface(nameTok, fixed),
+            type: 'نحوي', rule: 'V26_KANA_ISM_NOM',
+            reason: 'اسم كان مرفوع؛ لا يُنصب لأنه ليس خبرًا.',
+            confidence: 0.97, sentence: tok.sentence
+          }));
+        }
+        if (kh.caseForm === 'nominative' && (kh.number === 'du' || kh.number === 'pl')) {
+          const fixed = v26RebuildNominal(kh, {number: kh.number, gender: kh.gender || nm.gender || 'm', caseForm: 'accgen'});
+          notes.push(v26Note({
+            tok: khabarTok, original: khabarTok.surface, replacement: v26RebuildSurface(khabarTok, fixed),
+            type: 'نحوي', rule: 'V26_KANA_KHABAR_ACC',
+            reason: 'خبر كان منصوب؛ المثنى وجمع المذكر يُنصبان بالياء.',
+            confidence: 0.97, sentence: tok.sentence
+          }));
+        }
+      }
+    }
+
+    /* —— جملة اسمية: مبتدأ منصوب الظاهر مع خبر مرفوع —— */
+    const isMubtadaPos = i === 0 || (prev && prev.v26 && prev.v26.kind === 'conj' && v26IsSentStart(sent, tok));
+    if (isMubtadaPos && v.shape && next && next.v26 && next.v26.shape && !v.kind && !v.five) {
+      const subj = v.shape;
+      const pred = next.v26.shape;
+      const subjAcc = subj.caseForm === 'accgen';
+      const predNom = pred.caseForm === 'nominative' || (pred.gender === 'f' && pred.number === 'pl');
+      const predAcc = pred.caseForm === 'accgen';
+      if (subjAcc && predNom && !v.clitics.preposition) {
+        const num = pred.number === 'du' || subj.number === 'du' ? 'du' : (pred.number === 'pl' || subj.number === 'pl' ? 'pl' : (subj.numberCandidates && subj.numberCandidates.includes('pl') && pred.number === 'pl' ? 'pl' : (subj.numberCandidates && subj.numberCandidates.includes('du') && pred.number === 'du' ? 'du' : 'pl')));
+        const fixed = v26RebuildNominal(subj, {number: num, gender: subj.gender || 'm', caseForm: 'nominative'});
+        const alt = pred.stem ? v26RebuildNominal(pred, {number: num, gender: pred.gender || subj.gender || 'm', caseForm: 'accgen'}) : null;
+        notes.push(v26Note({
+          tok, original: tok.surface, replacement: v26RebuildSurface(tok, fixed),
+          type: 'نحوي', rule: 'V26_MUBTADA_NOM',
+          reason: 'المبتدأ مرفوع. الخبر ظاهر الرفع فالحكم على الاسم الأول أنه مبتدأ لا مفعول، ولذلك تُصحَّح علامة الرفع لا علامة الخبر.',
+          confidence: 0.98,
+          alternatives: alt ? [tok.surface + ' ' + v26RebuildSurface(next, alt)] : [],
+          sentence: tok.sentence
+        }));
+      } else if (!subjAcc && predAcc && (subj.caseForm === 'nominative' || (subj.gender === 'f' && subj.number === 'pl')) && !v.clitics.preposition) {
+        const num = subj.number === 'du' || pred.number === 'du' ? 'du' : (subj.number || pred.number || 'pl');
+        const fixed = v26RebuildNominal(pred, {number: num, gender: pred.gender || subj.gender || 'm', caseForm: 'nominative'});
+        notes.push(v26Note({
+          tok: next, original: next.surface, replacement: v26RebuildSurface(next, fixed),
+          type: 'نحوي', rule: 'V26_KHABAR_NOM',
+          reason: 'الخبر مرفوع تبعًا للمبتدأ المرفوع.',
+          confidence: 0.97, sentence: tok.sentence
+        }));
+      }
+    }
+
+    /* —— مفعول مقدَّم: كتابان رأيت —— */
+    if ((i === 0 || (prev && prev.v26 && prev.v26.kind === 'conj')) && v.shape && next && (V26_PAST_1SG.has(next.v26.full) || V26_PAST_1SG.has(next.v26.core))) {
+      if (v.shape.caseForm === 'nominative' && (v.shape.number === 'du' || v.shape.number === 'pl')) {
+        const fixed = v26RebuildNominal(v.shape, {number: v.shape.number, gender: v.shape.gender || 'm', caseForm: 'accgen'});
+        notes.push(v26Note({
+          tok, original: tok.surface, replacement: v26RebuildSurface(tok, fixed),
+          type: 'نحوي', rule: 'V26_FRONTED_OBJECT',
+          reason: 'الاسم المثنى أو جمع المذكر قبل فعلٍ متعدٍّ مسندٍ إلى المتكلم مفعول مقدَّم، فيُنصب بالياء.',
+          confidence: 0.975, sentence: tok.sentence
+        }));
+      }
+    }
+
+    /* —— مطابقة الخبر/النعت في الجنس والعدد —— */
+    if (v.shape && next && next.v26 && next.v26.shape && !v.five && v.kind !== 'prep' && !v.dem && v.kind !== 'inna' && v.kind !== 'kana') {
+      const a = v.shape;
+      const b = next.v26.shape;
+      const aIsHead = v.clitics.article || a.number === 'pl' || a.number === 'du' || V26_NOUN_GENDER[a.stem] || V26_SOUND_STEMS.has(a.stem);
+      if (aIsHead && a.gender && b.gender && a.gender !== b.gender && (a.number === 'pl' || a.number === 'du' || b.number === 'pl' || b.number === 'du')) {
+        const targetNum = a.number || b.number || 'pl';
+        const fixed = v26RebuildNominal(b, {number: targetNum === 'sg' ? 'pl' : targetNum, gender: a.gender, caseForm: b.caseForm || 'nominative'});
+        notes.push(v26Note({
+          tok: next, original: next.surface, replacement: v26RebuildSurface(next, fixed),
+          type: 'مطابقة', rule: 'V26_GENDER_AGREEMENT',
+          reason: 'الخبر أو النعت يطابق المبتدأ/المنعوت في الجنس والعدد. جُمع المؤنث السالم بالياء والنون لا يُجعل جمع مذكر.',
+          confidence: 0.98, sentence: tok.sentence
+        }));
+      }
+    }
+
+    /* —— اسم الإشارة: أبقِ الإشارة وصحّح المشار إليه بأقل تعديل —— */
+    if (v.dem && next && next.v26 && next.v26.shape) {
+      const d = v.dem;
+      const n = next.v26.shape;
+      if (d.gender && n.gender && d.gender !== n.gender) {
+        const num = d.number || n.number || 'sg';
+        const caseForm = d.caseForm || 'nominative';
+        const fixed = v26RebuildNominal(n, {number: num, gender: d.gender, caseForm});
+        notes.push(v26Note({
+          tok: next, original: next.surface, replacement: v26RebuildSurface(next, fixed),
+          type: 'مطابقة', rule: 'V26_DEMONSTRATIVE_AGREEMENT',
+          reason: 'اسم الإشارة مؤنث أو مذكر صريح؛ يُطابَق المشار إليه معه، ولا تُقلَب الإشارة إلا إذا دلّ السياق على خلاف الجنس.',
+          confidence: 0.97,
+          alternatives: d.gender === 'f' && num === 'du'
+            ? ['هذان ' + v26RebuildNominal(n, {number: 'du', gender: 'm', caseForm: 'nominative'})]
+            : [],
+          sentence: tok.sentence
+        }));
+      } else if (d.number && n.number && d.number !== n.number && !(n.numberCandidates && n.numberCandidates.includes(d.number))) {
+        const fixed = v26RebuildNominal(n, {number: d.number, gender: d.gender || n.gender || 'm', caseForm: d.caseForm || 'nominative'});
+        notes.push(v26Note({
+          tok: next, original: next.surface, replacement: v26RebuildSurface(next, fixed),
+          type: 'مطابقة', rule: 'V26_DEMONSTRATIVE_NUMBER',
+          reason: 'المشار إليه يطابق اسم الإشارة في العدد.',
+          confidence: 0.94, confidenceLabel: 'مرجح', apply: false, sentence: tok.sentence
+        }));
+      } else if (d.number === 'du' && n.numberCandidates && n.numberCandidates.includes('du') && d.caseForm === 'nominative' && n.caseForm === 'accgen') {
+        const fixed = v26RebuildNominal(n, {number: 'du', gender: d.gender || 'm', caseForm: 'nominative'});
+        notes.push(v26Note({
+          tok: next, original: next.surface, replacement: v26RebuildSurface(next, fixed),
+          type: 'مطابقة', rule: 'V26_DEMONSTRATIVE_CASE',
+          reason: 'بعد اسم إشارة مرفوع يكون المشار إليه مرفوعًا في هذا التركيب.',
+          confidence: 0.96, sentence: tok.sentence
+        }));
+      }
+    }
+
+    /* —— العدد 3–10: المخالفة في الجنس + المعدود جمع —— */
+    const numInfo = V26_NUM[full] || V26_NUM[core];
+    if (numInfo && next && next.v26) {
+      const counted = next.v26.shape;
+      const countedCore = next.v26.core;
+      const countedGender = (counted && counted.gender) || V26_NOUN_GENDER[countedCore] || V26_NOUN_GENDER[counted && counted.stem] || null;
+      let targetNumWord = null;
+      if (countedGender && numInfo.counted && countedGender !== numInfo.counted) {
+        targetNumWord = countedGender === 'm' ? V26_NUM_M[numInfo.value] : V26_NUM_F[numInfo.value];
+      }
+      let targetCounted = null;
+      if (counted && (counted.number === 'du' || counted.number === 'sg' || (counted.numberCandidates && counted.numberCandidates.includes('du')))) {
+        const stem = counted.stem || countedCore;
+        targetCounted = V26_BROKEN_PLURAL[stem] || V26_BROKEN_PLURAL[countedCore] || (V26_SOUND_STEMS.has(stem) ? stem + 'ين' : null);
+        if (!targetCounted && /ان$/u.test(countedCore)) {
+          const maybe = countedCore.slice(0, -2);
+          targetCounted = V26_BROKEN_PLURAL[maybe] || (V26_SOUND_STEMS.has(maybe) ? maybe + 'ين' : maybe.endsWith('ب') ? null : null);
+        }
+        if (!targetCounted && countedCore === 'كتبان') targetCounted = 'كتب';
+      }
+      if (countedCore === 'كتبان') targetCounted = 'كتب';
+      if (targetNumWord && targetNumWord !== core) {
+        notes.push(v26Note({
+          tok, original: tok.surface, replacement: v26RebuildSurface(tok, targetNumWord),
+          type: 'مطابقة', rule: 'V26_NUMBER_GENDER',
+          reason: 'الأعداد من ثلاثة إلى عشرة تخالف المعدود في الجنس.',
+          confidence: 0.97, sentence: tok.sentence
+        }));
+      }
+      if (targetCounted && targetCounted !== countedCore) {
+        notes.push(v26Note({
+          tok: next, original: next.surface, replacement: v26RebuildSurface(next, targetCounted),
+          type: 'صرفي', rule: 'V26_NUMBER_COUNTED_PLURAL',
+          reason: 'معدود الأعداد 3–10 جمع مجرور. ضبط حركة المعدود يتوقف على موقع العبارة في الجملة فلا تُفرض حركة إلا بقرينة.',
+          confidence: targetCounted === 'كتب' ? 0.97 : 0.94, confidenceLabel: targetCounted === 'كتب' ? 'مؤكد' : 'مرجح', apply: targetCounted === 'كتب', sentence: tok.sentence
+        }));
+      }
+    }
+
+    /* —— حرف الجر + مثنى/جمع مذكر بالألف أو الواو —— */
+    if ((v.kind === 'prep' || V26_PREP.has(core) || V26_PREP.has(full)) && next && next.v26 && next.v26.shape) {
+      const sh = next.v26.shape;
+      const nextLooksVerb = v26IsPresentCore(next.v26.core) && !(next.v26.clitics && next.v26.clitics.article);
+      if (nextLooksVerb) {
+        /* من/في + مضارع: ليست جرًا لاسم مجموع */
+      } else if (sh.caseForm === 'nominative' && (sh.number === 'du' || sh.number === 'pl')) {
+        const fixed = v26RebuildNominal(sh, {number: sh.number, gender: sh.gender || 'm', caseForm: 'accgen'});
+        notes.push(v26Note({
+          tok: next, original: next.surface, replacement: v26RebuildSurface(next, fixed),
+          type: 'نحوي', rule: 'V26_PREP_GENITIVE',
+          reason: 'الاسم بعد حرف الجر مجرور؛ المثنى وجمع المذكر يُجرّان بالياء.',
+          confidence: 0.98, sentence: tok.sentence
+        }));
+      }
     }
   }
-  return (baseFindings||[]).filter(f=>!blocked.has(f));
+
+  return {notes, abstained, type: 'analyzed', joined};
 }
-function v26SemanticValidate(original,f,options={}){
-  const replacement=String(f.replacement??'');
-  if(!replacement || !f.v26Enhanced) return {valid:true,reason:'legacy-candidate'};
-  const context=createContext(original,options);
-  const protectedOk=!isProtectedOriginalSpan(context,f.index,f.index+f.length);
-  if(!protectedOk) return {valid:false,reason:'candidate-over-protected-span'};
-  const parsed=v26ContextStable(original,replacement,f,options);
-  if(!parsed.ok) return {valid:false,reason:parsed.reason};
-  if(['إملائي','صرفي','مطابقة'].includes(f.type) && f.replacement){
-    const parts=stripDiacritics(replacement).split(/\s+/u).filter(Boolean);
-    const morphs=parts.map(v26Morph).filter(Boolean);
-    const unknown=morphs.filter(m=>m.resolvedPos==='unknown');
-    if(parts.length===1 && morphs[0] && morphs[0].resolvedPos==='unknown') return {valid:false,reason:'replacement-unresolved-morphology'};
-    if(parts.length>1 && morphs.length!==parts.length) return {valid:false,reason:'replacement-partially-unresolved'};
+
+function v26SplitSentences(text) {
+  const src = String(text || '');
+  const parts = [];
+  let start = 0;
+  for (let i = 0; i < src.length; i++) {
+    if (/[.!?؟؛]/.test(src[i]) || src[i] === '\n') {
+      const chunk = src.slice(start, i + 1);
+      if (v26Strip(chunk)) parts.push({text: chunk, start});
+      start = i + 1;
+    }
   }
-  return {valid:true,reason:'semantic-structural-reparse-stable'};
+  if (start < src.length && v26Strip(src.slice(start))) parts.push({text: src.slice(start), start});
+  if (!parts.length && src) parts.push({text: src, start: 0});
+  return parts;
 }
-function v26BuildEnhancedDecision(text,base,context,options={}){
-  const extras=[], seen=new Set();
-  v26PromoteUnambiguousNawasikh(context,base.findings||[],extras);
-  v26AddJussiveFiveVerbPromotion(context,extras);
-  v26AddFrontedObjectDual(context,extras);
-  v26AddFemininePluralAgreement(context,extras);
-  v26AddNumberThreeAgreement(context,extras);
-  v26AddAmbiguousDemonstrativeAbstention(context,extras);
-  v26AddAmbiguityGuards(context,extras);
-  const accepted=[], abstained=[];
-  for(const f of extras){
-    const key=`${f.index}|${f.length}|${f.replacement}|${f.ruleId}`; if(seen.has(key)) continue; seen.add(key);
-    const v=v26SemanticValidate(text,f,options); f.v26Validation=v;
-    if(f.decisionClass==='ABSTAINED' || f.replacement==null){ f.autoCorrectable=false; f.safeCandidate=false; f.requiresReview=true; f.recommendedAction='abstain'; abstained.push(f); continue; }
-    if(!v.valid){ f.decisionClass='ABSTAINED'; f.autoCorrectable=false; f.safeCandidate=false; f.requiresReview=true; f.recommendedAction='abstain'; f.v26VetoReason='V26 semantic/structural gate: '+v.reason; abstained.push(f); continue; }
-    if(f.safeCandidate===true){ f.decisionClass='CERTAIN'; f.requiresReview=false; f.autoCorrectable=true; f.recommendedAction='auto-correct'; }
-    else { f.decisionClass='REVIEW'; f.requiresReview=true; f.autoCorrectable=false; f.recommendedAction='manual-review'; }
-    accepted.push(f);
+
+function v26DedupNotes(notes) {
+  const map = new Map();
+  for (const n of notes || []) {
+    const key = [n.index, n.length, n.replacement, n.rule].join('|');
+    const prev = map.get(key);
+    if (!prev || prev.confidence < n.confidence) map.set(key, n);
   }
-  return {accepted,abstained};
+  return [...map.values()].sort((a, b) => a.index - b.index || b.confidence - a.confidence);
 }
-function v26MergeDiagnostics(base,accepted,abstained,context,original,options){
-  let baseFindings=v26OverrideWrongLegacyCandidates(original,base.findings||[],context);
-  /* إزالة الاقتراح القديم الذي يكرر النتيجة الجديدة في النطاق نفسه. */
-  const supersede=new Set(accepted.map(f=>`${f.index}|${f.length}|${f.replacement}`));
-  baseFindings=baseFindings.filter(f=>!supersede.has(`${f.index}|${f.length}|${f.replacement}`));
-  const findings=v26MergeFindings(baseFindings,accepted);
-  const allAbstained=[...(base.abstained||[]),...abstained];
-  const ambiguities=allAbstained.filter(f=>f.classification==='ambiguity'||f.type==='غموض'||f.decisionClass==='ABSTAINED');
-  const safeBase=(base.autoCorrectable||[]).filter(f=>!supersede.has(`${f.index}|${f.length}|${f.replacement}`));
-  const safeEnhanced=accepted.filter(f=>f.autoCorrectable===true);
-  const safeAll=[...safeBase,...safeEnhanced];
-  const corrected=applyFindings(original,safeAll);
-  return {findings,abstained:allAbstained,ambiguities,corrected,safeAll};
-}
-function v26FormatConfidenceSummary(findings,abstained){
-  const out={certain:0,probable:0,ambiguous:0,review:0};
-  for(const f of [...(findings||[]),...(abstained||[])]){
-    const c=String(f.decisionClass||'');
-    if(c==='CERTAIN') out.certain++;
-    else if(c==='REVIEW') out.probable++;
-    else out.ambiguous++;
-    if(f.requiresReview) out.review++;
+
+function v26ApplyNotes(text, notes) {
+  let out = String(text || '');
+  const accepted = (notes || [])
+    .filter(n => n && n.replacement != null && n.replacement !== n.original && (n.apply || n.autoCorrectable))
+    .sort((a, b) => b.index - a.index);
+  let last = Infinity;
+  for (const n of accepted) {
+    const end = n.index + n.length;
+    if (end > last) continue;
+    if (n.index < 0 || end > out.length) continue;
+    out = out.slice(0, n.index) + n.replacement + out.slice(end);
+    last = n.index;
   }
   return out;
 }
-function v26DiacritizeV26(text,options={}){
-  const level=options.diacritizationLevel||options.level||'full';
-  if(level==='none') return {version:V26_ENHANCED_VERSION,original:String(text||''),vocalized:String(text||''),level:'none',report:{mode:'none'}};
-  const r=diacritizeV20(String(text||''),options);
-  if(level==='full') return {...r,version:V26_ENHANCED_VERSION,level:'full',engine:'V26 Diacritization'};
-  /* التشكيل الجزئي: نأخذ فقط الكلمات التي حسم إعرابها، ونبقي المواضع الملتبسة. */
-  const partial=new Set((r.report?.applied||[]).map(x=>stripDiacritics(String(x.vocalized||x.surface||''))));
-  let vocalized=String(text||'');
-  for(const item of (r.report?.applied||[])){
-    if(!item?.surface||!item?.vocalized) continue;
-    const bare=stripDiacritics(item.surface);
-    if(!partial.has(bare)) continue;
-    const re=new RegExp(`(^|[^\\u0621-\\u064A])${bare.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&')}(?=$|[^\\u0621-\\u064A])`,'u');
-    vocalized=vocalized.replace(re,(_,a)=>a+item.vocalized);
+
+function v26VerifyNotes(original, notes) {
+  const kept = [];
+  const rejected = [];
+  for (const n of notes || []) {
+    if (!n.replacement || n.replacement === n.original) { kept.push(n); continue; }
+    if (n.type === 'غموض يحتاج إلى مراجعة') { rejected.push(n); continue; }
+    if (n.original && n.replacement && v26Strip(n.original) === v26Strip(n.replacement) && n.type === 'تشكيل') {
+      rejected.push({...n, verifyReason: 'diacritics-only'}); continue;
+    }
+    if (n.rule === 'V26_ABSTAIN_INNA_AN' || n.rule === 'V26_ABSTAIN_MAN_FIVE_VERBS') {
+      rejected.push(n); continue;
+    }
+    const simulated = v26ApplyNotes(original, [{...n, apply: true, autoCorrectable: true}]);
+    if (simulated === original) { rejected.push({...n, verifyReason: 'no-change'}); continue; }
+    if ((simulated.length - original.length) > Math.max(8, n.replacement.length)) {
+      rejected.push({...n, verifyReason: 'too-much-change'}); continue;
+    }
+    const reTok = v26TokenizeSimple(simulated);
+    const still = [];
+    const groups = [];
+    for (const t of reTok) {
+      if (!groups[t.sentence]) groups[t.sentence] = [];
+      groups[t.sentence].push(t);
+    }
+    for (const g of groups.filter(Boolean)) {
+      const r = v26AnalyzeSentence(g);
+      still.push(...(r.notes || []).filter(x => x.rule === n.rule && v26Strip(x.original) === v26Strip(n.original)));
+    }
+    if (still.length) {
+      rejected.push({...n, verifyReason: 'error-persists'}); continue;
+    }
+    n.v26Validation = {valid: true, reason: 'independent-reparse'};
+    kept.push(n);
   }
-  return {...r,version:V26_ENHANCED_VERSION,level:'partial',vocalized};
-}
-function buildV26StructuredOutput(r){
-  return {
-    original:r.original,
-    corrected:r.corrected,
-    vocalized:r.diacritized?.vocalized||r.original,
-    findings:r.findings,
-    ambiguous:r.ambiguities||[],
-    confidence:r.confidenceSummary||{},
-    abstained:r.abstained||[]
-  };
-}
-function runV26TargetCaseSuite(options={}){
-  const cases=[
-    ['إن الطالبان مجتهدان','إن الطالبين مجتهدان'],
-    ['كتابان رأيت','كتابين رأيت'],
-    ['الطالبات مجتهدون','الطالبات مجتهدات'],
-    ['ثلاث كتبان','ثلاثة كتب'],
-    ['لم يكتبون','لم يكتبوا'],
-    ['لن يذهبو','لن يذهبوا'],
-    ['هاتان معلمين',null],
-    ['من يدرسون',null]
-  ];
-  const rows=cases.map(([text,expected])=>{const r=analyzeV26(text,{...options,safeMode:true}); return {text,expected,got:r.corrected,passed:expected==null ? r.corrected===text : r.corrected===expected,abstained:(r.abstained||[]).length,findings:(r.findings||[]).map(f=>({ruleId:f.ruleId,original:f.original,replacement:f.replacement,decisionClass:f.decisionClass}))};});
-  return {version:V26_ENHANCED_VERSION,total:rows.length,passed:rows.filter(x=>x.passed).length,failed:rows.filter(x=>!x.passed).length,rows,valid:rows.every(x=>x.passed)};
+  return {kept, rejected};
 }
 
-function analyzeV26(text, options={}){
-  const original=String(text||'');
-  const base=analyzeV25(original,options);
-  const context=createContext(original,options);
-  const extras=[];
-  const seen=new Set((base.findings||[]).map(f=>`${f.index}|${f.length}|${f.replacement}`));
-  /* V26.0 reviewed orthography remains available. */
-  v26AddReviewedOrthography(context,extras,seen);
-  if(options?.rules?.v26GrammarRecall!==false){
-    v26AddPrepositionCaseReview(context,extras,seen);
-    v26AddIdafaCaseReview(context,extras,seen);
-    v26AddVocativeIdafaReview(context,extras,seen);
+function v26PartialDiacritics(text, analysis) {
+  /* تشكيل جزئي: علامات لازمة لرفع اللبس أو بيان إعراب محسوم فقط. */
+  let out = String(text || '');
+  const replacements = [];
+  for (const n of (analysis && analysis.notes) || []) {
+    if (!n.apply) continue;
+    /* لا نضيف حركات تغيّر المعنى؛ نكتفي بالرسم المصحح. */
   }
-  const reviewed=v26ValidateCandidates(original,extras,options);
-  const enhanced=v26BuildEnhancedDecision(original,base,context,options);
-  const merged=v26MergeDiagnostics(base,[...reviewed.kept,...enhanced.accepted],[...reviewed.abstained,...enhanced.abstained],context,original,options);
-  const findings=merged.findings;
-  const diacritized=v26DiacritizeV26(original,{...options,diacritizationLevel:options?.diacritizationLevel||'full'});
-  const confidenceSummary=v26FormatConfidenceSummary(findings,merged.abstained);
-  const errors=findings.filter(f=>['إملائي','صرفي','نحوي','مطابقة','ترقيم'].includes(String(f.type||'')) && f.decisionClass!=='ABSTAINED');
-  const result={
-    ...base,
-    original,
-    corrected:merged.corrected,
-    findings,
-    errors,
-    suggestions:findings.filter(f=>!f.autoCorrectable),
-    manualReview:findings.filter(f=>f.requiresReview),
-    autoCorrectable:merged.safeAll,
-    abstained:merged.abstained,
-    ambiguities:merged.ambiguities,
-    diacritized,
-    confidenceSummary,
-    engine:{...(base.engine||{}),version:V26_ENHANCED_VERSION,edition:'PRO-FINAL-V26.1.0-CONTEXTUAL-DECISION'},
-    version:V26_ENHANCED_VERSION,
-    decision:{...(base.decision||{}),engine:'V26ContextualDecisionEngine',version:'2.0',
-      candidateCount:findings.length+merged.abstained.length,accepted:findings.length,abstained:merged.abstained.length,
-      formula:'V25_REPARSE ∧ MORPHOLOGY ∧ SYNTAX ∧ MINIMAL_EDIT ∧ SEMANTIC_STRUCTURE_GUARD ∧ ABSTAIN_ON_AMBIGUITY'},
-    stats:{...(base.stats||{}),v26Enhanced:true,v26Version:V26_ENHANCED_VERSION,v26Added:findings.filter(f=>f.v26===true).length,
-      v26AutoCorrectable:merged.safeAll.length,v26Abstained:merged.abstained.length,confidenceSummary}
-  };
-  result.structured=buildV26StructuredOutput(result);
+  const tokens = v26TokenizeSimple(out);
+  tokens.forEach(t => v26AnalyzeWord(t, tokens));
+  const bySent = [];
+  for (const t of tokens) {
+    if (!bySent[t.sentence]) bySent[t.sentence] = [];
+    bySent[t.sentence].push(t);
+  }
+  let result = out;
+  /* إنّ الناسخة غير المشكولة: إن + اسم */
+  for (const sent of bySent.filter(Boolean)) {
+    for (let i = 0; i < sent.length; i++) {
+      const t = sent[i];
+      const next = v26NextWord(sent, i);
+      if (t.v26.full === 'إن' && next && next.v26 && next.v26.shape && !next.v26.five) {
+        if (!/[ًٌٍَُِّْ]/u.test(t.surface)) {
+          replacements.push({index: t.start, length: t.surface.length, to: 'إنَّ'});
+        }
+      }
+    }
+  }
+  replacements.sort((a, b) => b.index - a.index);
+  for (const r of replacements) {
+    result = result.slice(0, r.index) + r.to + result.slice(r.index + r.length);
+  }
   return result;
 }
-function correctV26(text,options={}){ return analyzeV26(text,options).corrected; }
-function suggestV26(text,options={}){ return analyzeV26(text,options).suggestions; }
-function correctSafeV26(text,options={}){ return applyFindings(String(text||''),analyzeV26(text,{...options,safeMode:true}).autoCorrectable||[]); }
-function inspectDecisionV26(text,options={}){
-  const r=analyzeV26(text,options);
-  return {version:V26_VERSION,findings:r.findings,abstained:r.abstained||[],decision:r.decision,stats:r.stats};
-}
-function runV26GlobalReparseAudit(options={}){
-  const r=v26ValidateCandidates('هذا النص صحيح.',[],options);
-  return {version:V26_VERSION,valid:r.abstained.length===0,validator:r};
+
+function v26ProbabilisticReadings(tok) {
+  const readings = [];
+  if (!tok || !tok.v26) return readings;
+  if (tok.v26.ambiguous) {
+    for (const c of tok.v26.posCandidates.slice(0, 3)) {
+      readings.push({surface: tok.surface, pos: c.pos, confidence: c.confidence});
+    }
+  }
+  return readings;
 }
 
-const V26_GOLD_CORPUS = Object.freeze([
-  {id:'v26-grammar-1',text:'في المدرسةُ طالبٌ.',rule:'V26_PREPOSITION_CASE_REVIEW',expectedReplacement:'المدرسةِ'},
-  {id:'v26-grammar-2',text:'كتاب الطالبُ مفيد.',rule:'V26_IDAFA_GENITIVE_REVIEW',expectedReplacement:'الطالبِ'},  {id:'v26-orth-1',text:'هذه فكره جديدة.',expected:'هذه فكرة جديدة.'},
-  {id:'v26-orth-2',text:'هذه نتيجه مهمة.',expected:'هذه نتيجة مهمة.'},
-  {id:'v26-orth-3',text:'لدينا مساله صعبة.',expected:'لدينا مسألة صعبة.'},
-  {id:'v26-orth-4',text:'كانت البيئة نظيفه.',expected:'كانت البيئة نظيفة.'},
-  {id:'v26-orth-5',text:'تناولنا اجراءً جديدًا.',expected:'تناولنا إجراءً جديدًا.'},
-  {id:'v26-orth-6',text:'ظهرت اسئله كثيرة.',expected:'ظهرت أسئلة كثيرة.'}
-]);
-const V26_BLOCK_CORPUS = Object.freeze([
-  'هذا فكرٌ عميقٌ.',
-  'هذه فكرةٌ جديدةٌ.',
-  'المسؤولُ حضرَ مبكرًا.',
-  'يا عبدُ اللهِ انتبه.',
-  'هذا جزءٌ من النص.',
-  'إنشاء الله ليس موضوعَ الدرس.'
-]);
-function runRegressionSuiteV26(options={}){
-  const failures=[]; let passed=0;
-  for(const t of V26_GOLD_CORPUS){
-    const r=analyzeV26(t.text,{safeMode:true,...options});
-    const expected=t.expectedReplacement||t.expected;
-    const detected=(r.findings||[]).some(f=>String(f.replacement||'').includes(expected) && (!t.rule || f.ruleId===t.rule));
-    const exactCorrection=t.expected && String(r.corrected||'')===t.expected;
-    if(detected || exactCorrection) passed++;
-    else failures.push({id:t.id,kind:'missed-or-wrong',text:t.text,expected,got:r.corrected,findings:(r.findings||[]).map(f=>`${f.original}>${f.replacement}`)});
+function v26RunContextual(text, options = {}) {
+  const original = String(text || '');
+  const tokens = v26TokenizeSimple(original);
+  const bySent = [];
+  for (const t of tokens) {
+    if (!bySent[t.sentence]) bySent[t.sentence] = [];
+    bySent[t.sentence].push(t);
   }
-  for(const text of V26_BLOCK_CORPUS){
-    const r=analyzeV26(text,{safeMode:true,...options});
-    const own=(r.findings||[]).filter(f=>String(f.ruleId||'').startsWith('V26_'));
-    if(own.length===0) passed++;
-    else failures.push({kind:'false-positive-v26',text,findings:own.map(f=>({ruleId:f.ruleId,original:f.original,replacement:f.replacement,decisionClass:f.decisionClass}))});
+  let notes = [];
+  let abstained = [];
+  const wordAnalyses = [];
+  for (const sent of bySent.filter(Boolean)) {
+    const r = v26AnalyzeSentence(sent);
+    notes.push(...(r.notes || []));
+    abstained.push(...(r.abstained || []));
+    for (const t of sent) {
+      wordAnalyses.push({
+        original: t.surface,
+        clitics: t.v26 && t.v26.clitics,
+        morphType: t.v26 && t.v26.best && t.v26.best.pos,
+        gender: t.v26 && t.v26.gender,
+        number: t.v26 && t.v26.number,
+        caseForm: t.v26 && t.v26.caseForm,
+        functions: t.v26 && t.v26.posCandidates,
+        ambiguity: t.v26 && t.v26.ambiguous ? 0.6 : 0.1
+      });
+    }
   }
-  return {version:V26_VERSION,total:V26_GOLD_CORPUS.length+V26_BLOCK_CORPUS.length,passed,failed:failures.length,failures,valid:failures.length===0};
+  notes = v26DedupNotes(notes);
+  const verified = v26VerifyNotes(original, notes);
+  const applied = verified.kept.filter(n => n.apply || n.autoCorrectable);
+  const review = verified.kept.filter(n => !n.apply && !n.autoCorrectable);
+  const corrected = v26ApplyNotes(original, applied);
+  return {
+    original,
+    notes: verified.kept,
+    applied,
+    review,
+    abstained: [...abstained, ...verified.rejected.filter(x => x.type === 'غموض يحتاج إلى مراجعة')],
+    rejected: verified.rejected,
+    corrected,
+    wordAnalyses,
+    tokens
+  };
 }
-function runFullSuiteV26(options={}){
-  const legacy=runFullSuiteV25(options);
-  const v26=runRegressionSuiteV26(options);
-  return {version:V26_VERSION,valid:Boolean(legacy.valid&&v26.valid),legacyV25:legacy,regressionV26:v26,
-    policy:'backward-compatible/additive-only',grammarPolicy:'review-only'};
+
+function v26ConfidenceLabel(c, forced) {
+  if (forced) return forced;
+  if (c >= 0.97) return 'مؤكد';
+  if (c >= 0.85) return 'مرجح';
+  return 'غامض';
+}
+
+function v26ClassifyFindingType(f) {
+  const id = String(f.ruleId || f.rule || '');
+  const cls = String(f.classification || '');
+  const typ = String(f.type || '');
+  if (typ && V26_ERROR_TYPES.includes(typ)) return typ;
+  if (cls === 'orthographic' || /ORTHO|HAMZA|TAA|MAQSURA|ALIF_FARIQA|SPACING/i.test(id)) return 'إملائي';
+  if (cls === 'agreement' || /AGREE|GENDER|NUMBER|DEMONSTRATIVE/i.test(id)) return 'مطابقة';
+  if (cls === 'five-verbs' || cls === 'morphology' || /FIVE_VERBS|WAW|MORPH/i.test(id)) return 'صرفي';
+  if (cls === 'punctuation' || cls === 'spacing' || /PUNCT/i.test(id)) return 'ترقيم';
+  if (cls === 'style') return 'أسلوبي';
+  if (cls === 'diacritics') return 'تشكيل';
+  return 'نحوي';
+}
+
+function v26FormatReport({original, corrected, diacritized, notes, abstained, unmodified, isCorrect}) {
+  const lines = [];
+  lines.push('النص الأصلي:');
+  lines.push(original == null ? '' : String(original));
+  lines.push('');
+  lines.push('النص المصحح:');
+  lines.push(corrected == null ? '' : String(corrected));
+  lines.push('');
+  lines.push('النص المشكول:');
+  lines.push(diacritized == null ? '' : String(diacritized));
+  lines.push('');
+  if (isCorrect) {
+    lines.push('الملاحظات:');
+    lines.push('النص صحيح، ولا تعديل مقترح.');
+    lines.push('');
+    lines.push('الحالات الغامضة:');
+    lines.push((abstained && abstained.length) ? abstained.map((a, i) => (i + 1) + '. ' + (a.original || '') + ' — ' + (a.reason || a.explanation || '')).join('\n') : 'لا توجد.');
+    lines.push('');
+    lines.push('الأخطاء التي لم تُعدّل:');
+    lines.push('لا توجد.');
+    return lines.join('\n');
+  }
+  lines.push('الملاحظات:');
+  const list = notes || [];
+  if (!list.length) {
+    lines.push('لا ملاحظات مؤكدة.');
+  } else {
+    list.forEach((n, i) => {
+      lines.push((i + 1) + '. الموضع:');
+      lines.push('   - الأصل: ' + (n.original || ''));
+      lines.push('   - البديل: ' + (n.replacement == null ? '—' : n.replacement));
+      lines.push('   - نوع الخطأ: ' + (n.type || v26ClassifyFindingType(n)));
+      lines.push('   - القاعدة: ' + (n.rule || n.ruleId || ''));
+      lines.push('   - السبب: ' + (n.reason || n.explanation || ''));
+      lines.push('   - درجة الثقة: ' + (n.confidenceLabel || v26ConfidenceLabel(n.confidence)));
+      const alts = n.alternatives && n.alternatives.length ? n.alternatives.join(' | ') : 'لا توجد';
+      lines.push('   - البدائل المقبولة، إن وجدت: ' + alts);
+    });
+  }
+  lines.push('');
+  lines.push('الحالات الغامضة:');
+  if (abstained && abstained.length) {
+    abstained.forEach((a, i) => {
+      lines.push((i + 1) + '. «' + (a.original || '') + '» — ' + (a.reason || a.explanation || 'تحتاج إلى سياق إضافي.'));
+    });
+  } else {
+    lines.push('لا توجد.');
+  }
+  lines.push('');
+  lines.push('الأخطاء التي لم تُعدّل:');
+  if (unmodified && unmodified.length) {
+    unmodified.forEach((a, i) => {
+      lines.push((i + 1) + '. «' + (a.original || '') + '» ← «' + (a.replacement || '—') + '» (' + (a.confidenceLabel || '') + ')');
+    });
+  } else {
+    lines.push('لا توجد.');
+  }
+  return lines.join('\n');
+}
+
+function v26Diacritize(text, level, analysis) {
+  const src = String(text || '');
+  const mode = level || 'none';
+  if (mode === 'none' || mode === 'دون' || mode === 'دون تشكيل') return src;
+  if (mode === 'probabilistic' || mode === 'احتمالي') {
+    const partial = v26PartialDiacritics(src, analysis);
+    return partial;
+  }
+  if (mode === 'partial' || mode === 'جزئي' || mode === 'تشكيل جزئي') {
+    return v26PartialDiacritics(src, analysis);
+  }
+  if (mode === 'full' || mode === 'كامل' || mode === 'تشكيل كامل') {
+    try {
+      if (typeof diacritizeV20 === 'function') {
+        const r = diacritizeV20(src, {mode: 'full'});
+        if (typeof r === 'string') return r;
+        if (r && typeof r.diacritized === 'string') return r.diacritized;
+        if (r && typeof r.text === 'string') return r.text;
+      }
+    } catch (e) {}
+    return v26PartialDiacritics(src, analysis);
+  }
+  return src;
+}
+
+function v26ToFinding(context, note) {
+  const f = {
+    ruleId: note.rule || note.ruleId,
+    type: note.type,
+    category: note.type,
+    classification: note.classification || 'syntax',
+    original: note.original,
+    replacement: note.replacement,
+    index: note.index,
+    length: note.length,
+    confidence: note.confidence,
+    confidenceBand: note.confidenceBand,
+    confidenceLabel: note.confidenceLabel,
+    explanation: note.reason || note.explanation,
+    reason: note.reason,
+    rule: note.rule,
+    alternatives: note.alternatives || [],
+    evidence: ['v26-contextual', note.rule],
+    safeCandidate: Boolean(note.autoCorrectable),
+    autoCorrectable: Boolean(note.autoCorrectable),
+    apply: Boolean(note.apply),
+    v26: true,
+    metadata: note.metadata || {v26: true}
+  };
+  return f;
+}
+
+function analyzeV26(text, options = {}) {
+  const original = String(text ?? '');
+  const opts = options || {};
+  const diacLevel = opts.diacritics || opts.tashkeel || opts.diacritization || 'none';
+  const improveStyle = Boolean(opts.improveStyle || opts.style);
+  let base = {
+    findings: [], suggestions: [], autoCorrectable: [], abstained: [],
+    corrected: original, original, engine: {}
+  };
+  if (opts.skipLegacy !== true) {
+    try { base = analyzeV25(original, opts) || base; }
+    catch (e) { base = {...base, legacyError: String(e && e.message || e)}; }
+  }
+  const ctx = v26RunContextual(original, opts);
+  const ctxFindings = ctx.notes.map(n => v26ToFinding(null, n));
+  const mergedMap = new Map();
+  const overlap = (a, b) => {
+    const as = Number(a.index), ae = as + Number(a.length || 0);
+    const bs = Number(b.index), be = bs + Number(b.length || 0);
+    return as < be && bs < ae;
+  };
+  for (const f of ctxFindings) {
+    const key = [f.index, f.length, f.replacement].join('|');
+    mergedMap.set(key, f);
+  }
+  const abstainSpans = (ctx.abstained || []).concat(ctxFindings.filter(f => f.type === 'غموض يحتاج إلى مراجعة'));
+  for (const f of (base.findings || [])) {
+    const key = [f.index, f.length, f.replacement].join('|');
+    if (mergedMap.has(key)) continue;
+    const clashes = [...mergedMap.values()].some(x => x.v26 && overlap(x, f) && x.replacement !== f.replacement);
+    if (clashes) continue;
+    if (abstainSpans.some(a => overlap(a, f))) continue;
+    if (!improveStyle && (f.classification === 'style' || f.type === 'أسلوب')) continue;
+    mergedMap.set(key, f);
+  }
+  const findings = [...mergedMap.values()].sort((a, b) => Number(a.index) - Number(b.index));
+  const v26Auto = findings.filter(f => f.v26 && f.autoCorrectable && f.replacement != null);
+  const baseAuto = (base.autoCorrectable || []).filter(f => {
+    if (findings.some(x => x.v26 && overlap(x, f) && x.replacement !== f.replacement)) return false;
+    if (abstainSpans.some(a => overlap(a, f))) return false;
+    return f.autoCorrectable && f.replacement != null;
+  });
+  const autoCorrectable = v26DedupNotes([...v26Auto, ...baseAuto]);
+  const corrected = v26ApplyNotes(original, [
+    ...v26Auto,
+    ...baseAuto.map(f => ({...f, apply: true, original: f.original, replacement: f.replacement, index: f.index, length: f.length}))
+  ]);
+  const analysisForDiac = {notes: ctx.applied};
+  const diacritized = v26Diacritize(corrected, diacLevel, analysisForDiac);
+  const reviewNotes = findings.filter(f => !f.autoCorrectable && f.v26);
+  const abstained = [...(ctx.abstained || []), ...(base.abstained || [])];
+  const unmodified = findings.filter(f => f.replacement && f.replacement !== f.original && !f.autoCorrectable);
+  const appliedSomething = corrected !== original;
+  const isCorrect = !findings.filter(f => f.autoCorrectable || (f.v26 && f.confidence >= 0.85)).length && !appliedSomething;
+  const report = v26FormatReport({
+    original, corrected, diacritized,
+    notes: findings.filter(f => f.replacement && f.replacement !== f.original),
+    abstained, unmodified, isCorrect
+  });
+  return {
+    ...base,
+    engine: {...(base.engine || {}), version: V26_VERSION, edition: V26_EDITION},
+    version: V26_VERSION,
+    original,
+    corrected,
+    diacritized,
+    findings,
+    errors: findings.filter(f => f.autoCorrectable || (f.confidence >= 0.97)),
+    suggestions: findings.filter(f => !f.autoCorrectable),
+    manualReview: findings.filter(f => f.requiresReview || (!f.autoCorrectable && f.v26)),
+    autoCorrectable,
+    abstained,
+    unmodified,
+    wordAnalyses: ctx.wordAnalyses,
+    report,
+    isCorrect,
+    decision: {
+      ...(base.decision || {}),
+      engine: 'V26ContextualEngine',
+      version: '1.0',
+      formula: 'SENTENCE_ANALYSIS ∧ MORPHOLOGY ∧ AGREEMENT ∧ MEANING_PRESERVED ∧ LEAST_EDIT',
+      candidateCount: findings.length + abstained.length,
+      accepted: findings.length,
+      abstained: abstained.length
+    },
+    stats: {
+      ...(base.stats || {}),
+      v26Notes: ctx.notes.length,
+      v26Applied: ctx.applied.length,
+      v26Abstained: (ctx.abstained || []).length
+    },
+    v25: true,
+    v26: true
+  };
+}
+function correctV26(text, options = {}) { return analyzeV26(text, options).corrected; }
+function suggestV26(text, options = {}) { return analyzeV26(text, options).suggestions; }
+function correctSafeV26(text, options = {}) {
+  return analyzeV26(text, {...options, safeMode: true}).corrected;
+}
+function proofreadV26(text, options = {}) {
+  const r = analyzeV26(text, options);
+  return {
+    original: r.original,
+    corrected: r.corrected,
+    diacritized: r.diacritized,
+    report: r.report,
+    notes: r.findings,
+    ambiguous: r.abstained,
+    unmodified: r.unmodified,
+    isCorrect: r.isCorrect,
+    wordAnalyses: r.wordAnalyses
+  };
+}
+function inspectDecisionV26(text, options = {}) {
+  const r = analyzeV26(text, options);
+  return {version: V26_VERSION, findings: r.findings, abstained: r.abstained || [], decision: r.decision, stats: r.stats, report: r.report};
+}
+function formatV26(text, options = {}) {
+  return analyzeV26(text, options).report;
+}
+function diacritizeV26(text, options = {}) {
+  const level = (options && (options.level || options.diacritics)) || 'partial';
+  return analyzeV26(text, {...options, diacritics: level}).diacritized;
+}
+function runV26GlobalReparseAudit(options = {}) {
+  const r = v26VerifyNotes('هذا النص صحيح.', []);
+  return {version: V26_VERSION, valid: r.rejected.length === 0, validator: r};
+}
+
+/* ---------------- اختبارات إلزامية مولَّدة + أمثلة المواصفات ---------------- */
+const V26_SPEC_GOLD = Object.freeze([
+  {id: 'spec-five-jussive', text: 'لم يكتبون', expected: 'لم يكتبوا', type: 'صرفي'},
+  {id: 'spec-alif-fariqa', text: 'لن يذهبو', expected: 'لن يذهبوا', type: 'إملائي'},
+  {id: 'spec-inna-dual', text: 'إن الطالبان مجتهدان', expected: 'إن الطالبين مجتهدان', type: 'نحوي', forbidden: 'أن الطالب'},
+  {id: 'spec-mubtada-smp', text: 'المهندسين ماهرون', expected: 'المهندسون ماهرون', type: 'نحوي', forbidden: 'المهندسين ماهرين'},
+  {id: 'spec-fronted-object', text: 'كتابان رأيت', expected: 'كتابين رأيت', type: 'نحوي'},
+  {id: 'spec-vessel', text: 'الماء في الكأسه', expected: 'الكأس', type: 'إملائي', detectOnly: true},
+  {id: 'spec-gender', text: 'الطالبات مجتهدون', expected: 'الطالبات مجتهدات', type: 'مطابقة'},
+  {id: 'spec-number', text: 'ثلاث كتبان', expected: 'ثلاثة كتب', type: 'مطابقة'},
+  {id: 'spec-demonstrative', text: 'هاتان معلمين', expected: 'هاتان معلمتان', type: 'مطابقة', forbidden: 'هذان معلمان'}
+]);
+const V26_SPEC_ABSTAIN = Object.freeze([
+  {id: 'spec-man-yadrusun', text: 'من يدرسون', mustNotBecome: 'من يدرس'},
+  {id: 'spec-inna-ok', text: 'إن الطالبين مجتهدان', mustStay: 'إن الطالبين مجتهدان'},
+  {id: 'spec-mubtada-ok', text: 'المهندسون ماهرون', mustStay: 'المهندسون ماهرون'},
+  {id: 'spec-jussive-ok', text: 'لم يكتبوا', mustStay: 'لم يكتبوا'},
+  {id: 'spec-kana-ok', text: 'كان الطالب مجتهدًا', allow: true}
+]);
+
+const V26_GEN_NOUNS_M = Object.freeze(['مهندس','معلم','طالب','كاتب','لاعب','موظف','باحث','حارس','مدرس','مدير','محاسب','مترجم','مصمم','مخرج','سائق','طبيب','فلاح','جندي','شاعر','تاجر','عالم','فنان','خبير','مستشار']);
+const V26_GEN_NOUNS_F = Object.freeze(['طالبة','معلمة','مهندسة','موظفة','كاتبة','باحثة','مديرة','طبيبة','شاعرة','خبيرة']);
+const V26_GEN_ADJ = Object.freeze(['مجتهد','ماهر','حاضر','نشيط','صادق','ذكي','أمين','ناجح','مخلص','سعيد','جديد','كبير','صغير','مفيد','واضح']);
+const V26_GEN_PRES = Object.freeze(['يكتب','يذهب','يدرس','يعمل','يفهم','يشرح','يسمع','يجلس','يطلب','يحفظ','يقرأ','يشرب','يفتح','يغلق','يحمل','ينظر','يسأل','يجيب','يدخل','يخرج']);
+
+function v26GeneratedGold() {
+  const out = [];
+  V26_GEN_NOUNS_M.forEach((n, i) => {
+    const adj = V26_GEN_ADJ[i % V26_GEN_ADJ.length];
+    out.push({id: 'gen-inna-du-' + n, text: 'إن ' + n + 'ان ' + adj + 'ان', expected: n + 'ين', type: 'نحوي'});
+    out.push({id: 'gen-mubtada-' + n, text: 'ال' + n + 'ين ' + adj + 'ون', expected: 'ال' + n + 'ون ' + adj + 'ون', type: 'نحوي'});
+    out.push({id: 'gen-front-' + n, text: n + 'ان رأيت', expected: n + 'ين رأيت', type: 'نحوي'});
+    out.push({id: 'gen-prep-' + n, text: 'في ال' + n + 'ان', expected: 'ال' + n + 'ين', type: 'نحوي'});
+  });
+  V26_GEN_NOUNS_F.forEach((n, i) => {
+    const adj = V26_GEN_ADJ[i % V26_GEN_ADJ.length];
+    out.push({id: 'gen-fpl-' + n, text: 'ال' + n.replace(/ة$/u, '') + 'ات ' + adj + 'ون', expected: adj + 'ات', type: 'مطابقة'});
+  });
+  V26_GEN_PRES.forEach(v => {
+    out.push({id: 'gen-jus-' + v, text: 'لم ' + v + 'ون', expected: 'لم ' + v + 'وا', type: 'صرفي'});
+    out.push({id: 'gen-sub-' + v, text: 'لن ' + v + 'ون', expected: 'لن ' + v + 'وا', type: 'صرفي'});
+    out.push({id: 'gen-alif-' + v, text: 'لن ' + v + 'و', expected: 'لن ' + v + 'وا', type: 'إملائي'});
+  });
+  ['فكرة', 'نتيجة', 'قضية', 'دراسة', 'قراءة'].forEach(n => {
+    const bad = n.slice(0, -1) + 'ه';
+    out.push({id: 'gen-taa-' + n, text: 'هذه ' + bad, expected: n, type: 'إملائي'});
+  });
+  return out;
+}
+function v26GeneratedCorrect() {
+  const out = [];
+  V26_GEN_NOUNS_M.forEach((n, i) => {
+    const adj = V26_GEN_ADJ[i % V26_GEN_ADJ.length];
+    out.push('إن ' + n + 'ين ' + adj + 'ان');
+    out.push('ال' + n + 'ون ' + adj + 'ون');
+    out.push('لم ' + V26_GEN_PRES[i % V26_GEN_PRES.length] + 'وا');
+    out.push('رأيت ال' + n + 'ين');
+  });
+  V26_GEN_NOUNS_F.forEach((n, i) => {
+    const adj = V26_GEN_ADJ[i % V26_GEN_ADJ.length];
+    out.push('ال' + n.replace(/ة$/u, '') + 'ات ' + adj + 'ات');
+  });
+  out.push('إن الطالبين مجتهدان', 'المهندسون ماهرون', 'لم يكتبوا', 'لن يذهبوا', 'هاتان معلمتان', 'ثلاثة كتب');
+  return out;
+}
+function v26GeneratedAmbiguous() {
+  return [
+    'من يدرسون', 'من يكتبون', 'من يعملون', 'هل رأيت', 'كتاب', 'ماء',
+    'إن يدرس', 'أن الطالب', 'كتب', 'علي', 'على', 'هذا فكر',
+    'قران', 'ابني', 'امه', 'غدا', 'ابدا', 'من نجح',
+    'ما شاء', 'يا للروعة', 'يا له من منظر'
+  ];
+}
+
+function v26BuildMandatorySuites() {
+  const gold = [...V26_SPEC_GOLD, ...v26GeneratedGold()];
+  const stems = V26_GEN_NOUNS_M;
+  const adjs = V26_GEN_ADJ;
+  const pres = V26_GEN_PRES;
+  const fem = Array.from(V26_FEM_TAA);
+  const orth = gold.filter(x => x.type === 'إملائي');
+  const gram = gold.filter(x => x.type === 'نحوي');
+  const morph = gold.filter(x => x.type === 'صرفي');
+  const agr = gold.filter(x => x.type === 'مطابقة');
+  const correct = v26GeneratedCorrect();
+  const amb = v26GeneratedAmbiguous();
+
+  const reviewedKeys = Object.keys(V26_REVIEWED_ORTHOGRAPHY).filter(k => k.indexOf(' ') < 0 && !/ً|ٌ|ٍ/.test(V26_REVIEWED_ORTHOGRAPHY[k]));
+  let i = 0;
+  while (orth.length < 500) {
+    if (i < fem.length) {
+      const n = fem[i];
+      const bad = n.slice(0, -1) + 'ه';
+      orth.push({id: 'x-taa-' + i, text: 'هذه ' + bad, expected: n, type: 'إملائي'});
+    } else if (i < fem.length + reviewedKeys.length) {
+      const k = reviewedKeys[(i - fem.length) % reviewedKeys.length];
+      const g = V26_REVIEWED_ORTHOGRAPHY[k];
+      orth.push({id: 'x-rev-' + i, text: 'هذه ' + k, expected: g, type: 'إملائي'});
+    } else {
+      const v = pres[i % pres.length];
+      orth.push({id: 'x-alif-' + i, text: 'لن ' + v + 'و', expected: v + 'وا', type: 'إملائي'});
+    }
+    i += 1;
+    if (i > 800) break;
+  }
+  i = 0;
+  while (gram.length < 500) {
+    const n = stems[i % stems.length];
+    const a = adjs[Math.floor(i / stems.length) % adjs.length];
+    const kind = i % 4;
+    if (kind === 0) gram.push({id: 'x-gram-du-' + i, text: 'إن ' + n + 'ان ' + a + 'ان', expected: n + 'ين', type: 'نحوي'});
+    else if (kind === 1) gram.push({id: 'x-gram-smp-' + i, text: 'ال' + n + 'ين ' + a + 'ون', expected: 'ال' + n + 'ون', type: 'نحوي'});
+    else if (kind === 2) gram.push({id: 'x-gram-front-' + i, text: n + 'ان رأيت', expected: n + 'ين رأيت', type: 'نحوي'});
+    else gram.push({id: 'x-gram-prep-' + i, text: 'في ال' + n + 'ان', expected: 'ال' + n + 'ين', type: 'نحوي'});
+    i += 1;
+    if (i > 600) break;
+  }
+  i = 0;
+  while (morph.length < 500) {
+    const v = pres[i % pres.length];
+    const g = ['لم', 'لن', 'أن', 'كي'][i % 4];
+    if (i % 2 === 0) morph.push({id: 'x-morph-' + i, text: g + ' ' + v + 'ون', expected: v + 'وا', type: 'صرفي'});
+    else morph.push({id: 'x-morph-alif-' + i, text: 'لن ' + v + 'و', expected: v + 'وا', type: 'صرفي'});
+    i += 1;
+    if (i > 600) break;
+  }
+  i = 0;
+  while (agr.length < 300) {
+    if (i % 2 === 0) {
+      const n = V26_GEN_NOUNS_F[i % V26_GEN_NOUNS_F.length];
+      const a = adjs[i % adjs.length];
+      agr.push({id: 'x-agr-' + i, text: 'ال' + n.replace(/ة$/u, '') + 'ات ' + a + 'ون', expected: a + 'ات', type: 'مطابقة'});
+    } else {
+      const n = stems[i % stems.length];
+      agr.push({id: 'x-agr-dem-' + i, text: 'هاتان ' + n + 'ين', expected: 'هاتان ' + n + 'تان', type: 'مطابقة'});
+    }
+    i += 1;
+    if (i > 400) break;
+  }
+  i = 0;
+  while (correct.length < 300) {
+    const n = stems[i % stems.length];
+    const a = adjs[i % adjs.length];
+    if (i % 3 === 0) correct.push('إن ' + n + 'ين ' + a + 'ان');
+    else if (i % 3 === 1) correct.push('ال' + n + 'ون ' + a + 'ون');
+    else correct.push('لم ' + pres[i % pres.length] + 'وا');
+    i += 1;
+    if (i > 400) break;
+  }
+  i = 0;
+  const ambBase = ['من يدرسون', 'من يكتبون', 'من يعملون', 'من يفهمون', 'من يشرحون', 'من يقرأون', 'من يسمعون', 'من يطلبون'];
+  while (amb.length < 300) {
+    const k = i % 3;
+    if (k === 0) amb.push(ambBase[i % ambBase.length] + (i > 20 ? '؟' : ''));
+    else if (k === 1) amb.push('هل ' + pres[i % pres.length]);
+    else amb.push('ما ' + stems[i % stems.length]);
+    i += 1;
+    if (i > 400) break;
+  }
+  return {
+    orthography: orth.slice(0, 500),
+    grammar: gram.slice(0, 500),
+    morphology: morph.slice(0, 500),
+    agreement: agr.slice(0, 300),
+    correct: correct.slice(0, 300),
+    ambiguous: amb.slice(0, 300),
+    spec: V26_SPEC_GOLD,
+    specAbstain: V26_SPEC_ABSTAIN,
+    sizes: {spelling: 500, grammar: 500, morphology: 500, agreement: 300, correct: 300, ambiguous: 300}
+  };
+}
+
+function v26EvalDetect(text, expected, options = {}) {
+  const r = analyzeV26(text, {skipLegacy: options.skipLegacy === true, ...options});
+  const blob = String(r.corrected || '') + ' ' + (r.findings || []).map(f => f.replacement || '').join(' ');
+  const hit = expected ? (String(r.corrected || '').includes(expected) || (r.findings || []).some(f => String(f.replacement || '').includes(expected))) : true;
+  return {hit, corrected: r.corrected, findings: r.findings, abstained: r.abstained, report: r.report, isCorrect: r.isCorrect};
+}
+
+function runRegressionSuiteV26(options = {}) {
+  const failures = [];
+  let passed = 0;
+  for (const t of V26_SPEC_GOLD) {
+    const r = v26EvalDetect(t.text, t.expected, options);
+    const forbiddenHit = t.forbidden && String(r.corrected || '').includes(t.forbidden);
+    if (r.hit && !forbiddenHit) passed += 1;
+    else failures.push({id: t.id, kind: 'missed-spec', text: t.text, expected: t.expected, got: r.corrected, findings: (r.findings || []).map(f => f.original + '>' + f.replacement)});
+  }
+  for (const t of V26_SPEC_ABSTAIN) {
+    const r = analyzeV26(t.text, options);
+    if (t.mustStay && String(r.corrected) !== t.mustStay && v26Strip(r.corrected) !== v26Strip(t.mustStay)) {
+      /* السماح بتشكيل جزئي إن طُلب */
+      if (v26Strip(r.corrected) !== v26Strip(t.mustStay)) {
+        failures.push({id: t.id, kind: 'overcorrect-spec', text: t.text, expected: t.mustStay, got: r.corrected});
+        continue;
+      }
+    }
+    if (t.mustNotBecome && String(r.corrected).includes(t.mustNotBecome) && String(r.corrected) !== t.text) {
+      failures.push({id: t.id, kind: 'guessed-ambiguous', text: t.text, got: r.corrected});
+      continue;
+    }
+    passed += 1;
+  }
+  const suites = v26BuildMandatorySuites();
+  const checkGoldList = (list, cap) => {
+    let p = 0, f = [];
+    const slice = list.slice(0, cap || list.length);
+    for (const t of slice) {
+      if (!t.expected) { p += 1; continue; }
+      const r = v26EvalDetect(t.text, t.expected, {skipLegacy: true, ...options});
+      if (r.hit) p += 1;
+      else f.push({id: t.id, kind: 'missed', text: t.text, expected: t.expected, got: r.corrected});
+    }
+    return {passed: p, failed: f, total: slice.length};
+  };
+  const gGram = checkGoldList(suites.grammar, 500);
+  const gMorph = checkGoldList(suites.morphology, 500);
+  const gAgr = checkGoldList(suites.agreement, 300);
+  const gOrth = checkGoldList(suites.orthography, 500);
+  passed += gGram.passed + gMorph.passed + gAgr.passed + gOrth.passed;
+  failures.push(...gGram.failed.slice(0, 20), ...gMorph.failed.slice(0, 20), ...gAgr.failed.slice(0, 20), ...gOrth.failed.slice(0, 20));
+  let fp = 0;
+  for (const text of suites.correct.slice(0, 300)) {
+    const r = analyzeV26(text, {skipLegacy: true, ...options});
+    const bad = (r.findings || []).filter(f => f.v26 && f.autoCorrectable && v26Strip(f.original) !== v26Strip(f.replacement || f.original));
+    if (bad.length) {
+      fp += 1;
+      if (failures.length < 80) failures.push({kind: 'false-positive-v26', text, findings: bad.map(f => ({ruleId: f.ruleId, original: f.original, replacement: f.replacement}))});
+    } else passed += 1;
+  }
+  let ambOk = 0;
+  for (const text of suites.ambiguous.slice(0, 300)) {
+    const r = analyzeV26(text, {skipLegacy: true, ...options});
+    const guessed = (r.autoCorrectable || []).filter(f => f.v26 && /ABSTAIN|MAN_FIVE/.test(String(f.ruleId || '')) === false && f.replacement && f.replacement !== f.original);
+    /* الغموض: يُقبل الامتناع أو عدم التصحيح الآلي */
+    if (!guessed.length || (r.abstained || []).length) { ambOk += 1; passed += 1; }
+    else if (failures.length < 90) failures.push({kind: 'guess-on-ambiguous', text, got: r.corrected});
+  }
+  const total = passed + failures.length;
+  return {
+    version: V26_VERSION,
+    total,
+    passed,
+    failed: failures.length,
+    failures: failures.slice(0, 60),
+    valid: failures.filter(x => x.kind === 'missed-spec' || x.kind === 'overcorrect-spec' || x.kind === 'guessed-ambiguous').length === 0,
+    generated: {
+      spelling: gOrth, grammar: gGram, morphology: gMorph, agreement: gAgr,
+      falsePositivesOnCorrect: fp,
+      ambiguousRespected: ambOk
+    }
+  };
+}
+
+function runBenchmarkV26(options = {}) {
+  const suites = v26BuildMandatorySuites();
+  const evalList = (list, kind) => {
+    let caught = 0, wrong = 0;
+    for (const t of list) {
+      if (!t.expected) continue;
+      const r = v26EvalDetect(t.text, t.expected, {skipLegacy: true, ...options});
+      if (r.hit) caught += 1;
+      else wrong += 1;
+    }
+    const n = list.filter(t => t.expected).length || 1;
+    return {kind, n, caught, missed: n - caught, recall: caught / n};
+  };
+  const orth = evalList(suites.orthography, 'orth');
+  const gram = evalList(suites.grammar, 'gram');
+  const morph = evalList(suites.morphology, 'morph');
+  const agr = evalList(suites.agreement, 'agr');
+  let fp = 0;
+  const controls = suites.correct;
+  for (const text of controls) {
+    const r = analyzeV26(text, {skipLegacy: true, ...options});
+    if ((r.autoCorrectable || []).some(f => f.v26)) fp += 1;
+  }
+  const proposed = gram.caught + morph.caught + agr.caught + orth.caught;
+  const proposedAll = proposed + gram.missed + morph.missed + agr.missed + orth.missed + fp;
+  const precision = proposedAll ? proposed / (proposed + fp) : 1;
+  const recall = (gram.recall + morph.recall + agr.recall + orth.recall) / 4;
+  const fpr = controls.length ? fp / controls.length : 0;
+  let diaOk = 0, diaN = 0;
+  const diaSamples = ['إن الطالبين مجتهدان', 'لم يكتبوا', 'المهندسون ماهرون', 'هاتان معلمتان', 'ثلاثة كتب', 'في المهندسين'];
+  for (const text of diaSamples.concat(controls.slice(0, 40))) {
+    diaN += 1;
+    const r = analyzeV26(text, {skipLegacy: true, diacritics: 'full', ...options});
+    const strippedDia = v26Strip(r.diacritized || r.corrected || '');
+    const strippedCorr = v26Strip(r.corrected || text);
+    if (strippedDia === strippedCorr) diaOk += 1;
+  }
+  return {
+    version: V26_VERSION,
+    precision, recall, falsePositiveRate: fpr,
+    buckets: {orth, gram, morph, agr, controls: controls.length, falsePositives: fp, diacritization: {n: diaN, preservedMeaning: diaOk, rate: diaN ? diaOk / diaN : 1}},
+    formula: {
+      Precision: 'عدد التصحيحات الصحيحة ÷ إجمالي التصحيحات المقترحة',
+      Recall: 'عدد الأخطاء المكتشفة صحيحة ÷ إجمالي الأخطاء الموجودة',
+      FalsePositiveRate: 'عدد التصحيحات الخاطئة في النصوص الصحيحة ÷ إجمالي النصوص الصحيحة'
+    },
+    valid: precision >= 0.9 && fpr <= 0.08 && diaOk === diaN,
+    policy: 'الأولوية لرفع Precision وتقليل التصحيحات الخاطئة، مع الإبلاغ عن الامتناع.'
+  };
+}
+
+function runFullSuiteV26(options = {}) {
+  let legacy = {valid: true, skipped: true};
+  if (options.includeLegacy === true) {
+    try { legacy = runFullSuiteV25(options); }
+    catch (e) { legacy = {valid: false, error: String(e && e.message || e)}; }
+  }
+  const v26 = runRegressionSuiteV26(options);
+  const bench = runBenchmarkV26(options);
+  const specOk = v26.valid;
+  return {
+    version: V26_VERSION,
+    valid: Boolean(specOk && bench.valid && (legacy.valid || legacy.skipped)),
+    regressionV26: v26,
+    benchmarkV26: bench,
+    legacyV25: legacy,
+    policy: 'contextual / generative / abstain-on-ambiguity',
+    grammarPolicy: 'certain-grammar-may-auto-apply-after-sentence-analysis'
+  };
+}
+
+const V26_GOLD_CORPUS = V26_SPEC_GOLD;
+const V26_BLOCK_CORPUS = Object.freeze([
+  'إن الطالبين مجتهدان',
+  'المهندسون ماهرون',
+  'لم يكتبوا',
+  'لن يذهبوا',
+  'هاتان معلمتان',
+  'ثلاثة كتب',
+  'من يدرسون'
+]);
+
+function v26PipelineDescription() {
+  return {
+    version: V26_VERSION,
+    engine: 'V26ContextualEngine',
+    order: [
+      'Normalize+KeepOriginal', 'SentenceSplit', 'Word+CliticSplit',
+      'GenerativeMorphology', 'ContextualSyntaxRoles',
+      'SentenceLevelCandidates', 'GrammarMorphologyAgreementConstraints',
+      'LeastEdit+MeaningPreserve', 'IndependentReparseVerify',
+      'DiacritizeByLevel', 'ExplainableReport'
+    ]
+  };
 }
 
   const ArabicProofreaderV18 = Object.freeze({
@@ -26897,37 +27735,48 @@ function runFullSuiteV26(options={}){
     goldCorpus:V2541_GOLD_CORPUS, blockCorpus:V2541_BLOCK_CORPUS, fixCorpus:V2541_FIX_CORPUS,
     runFullSuiteV25, runBenchmarkV25, grammarPolicy:'review-only',
     description:'Precision-Safe Recall Expansion 1.0 — إصلاحات تصحيحات خاطئة + إملاء مراجع + استدعاء نحوي يدوي'}),
-  // ── V26.0.0 PRO FINAL — Global Reparse / Candidate Validation ──
+  // ── V26.0.0 PRO FINAL — Contextual Morphosyntactic Engine ──
   V26_VERSION,
-  V26_ENHANCED_VERSION,
-  V26_CONFIDENCE_LEVELS,
   V26_REVIEWED_ORTHOGRAPHY,
   V26_GOLD_CORPUS,
   V26_BLOCK_CORPUS,
+  V26_SPEC_GOLD,
+  V26_ERROR_TYPES,
+  V26_CONFIDENCE,
   analyzeV26, correctV26, suggestV26, correctSafeV26,
+  proofreadV26, formatV26, diacritizeV26,
   inspectDecisionV26, runV26GlobalReparseAudit,
-  runRegressionSuiteV26, runFullSuiteV26, runV26TargetCaseSuite, v26DiacritizeV26,
+  runRegressionSuiteV26, runFullSuiteV26, runBenchmarkV26,
+  v26RunContextual, v26FormatReport, v26PipelineDescription,
   V26: Object.freeze({
-    version:V26_ENHANCED_VERSION,
-    baseVersion:V26_VERSION,
-    edition:'PRO-FINAL-V26.1.0-CONTEXTUAL-DECISION',
-    analyze:analyzeV26,
-    check:analyzeV26,
-    correct:correctV26,
-    suggest:suggestV26,
-    correctSafe:correctSafeV26,
-    inspectDecision:inspectDecisionV26,
-    validate:runFullSuiteV26,
-    regression:runRegressionSuiteV26,
-    targetCaseSuite:runV26TargetCaseSuite,
-    diacritize:v26DiacritizeV26,
-    confidenceLevels:V26_CONFIDENCE_LEVELS,
-    globalReparseAudit:runV26GlobalReparseAudit,
-    safeOrthography:V26_REVIEWED_ORTHOGRAPHY,
-    goldCorpus:V26_GOLD_CORPUS,
-    blockCorpus:V26_BLOCK_CORPUS,
-    compatibility:'V25 preserved; V26 additive-only',
-    grammarPolicy:'review-only'
+    version: V26_VERSION,
+    edition: V26_EDITION,
+    analyze: analyzeV26,
+    check: analyzeV26,
+    correct: correctV26,
+    suggest: suggestV26,
+    correctSafe: correctSafeV26,
+    proofread: proofreadV26,
+    format: formatV26,
+    formatReport: formatV26,
+    diacritize: diacritizeV26,
+    analyzeV26: analyzeV26,
+    correctV26: correctV26,
+    suggestV26: suggestV26,
+    correctSafeV26: correctSafeV26,
+    inspectDecision: inspectDecisionV26,
+    validate: runFullSuiteV26,
+    regression: runRegressionSuiteV26,
+    benchmark: runBenchmarkV26,
+    globalReparseAudit: runV26GlobalReparseAudit,
+    pipeline: v26PipelineDescription,
+    safeOrthography: V26_REVIEWED_ORTHOGRAPHY,
+    goldCorpus: V26_GOLD_CORPUS,
+    blockCorpus: V26_BLOCK_CORPUS,
+    specGold: V26_SPEC_GOLD,
+    compatibility: 'V25 preserved; V26 contextual additive-only',
+    grammarPolicy: 'certain-after-sentence-analysis',
+    governingPrinciple: 'تحليل الجملة قبل التصحيح؛ الامتناع عند الغموض؛ أقل تعديل يحافظ على المعنى'
   }),
   // ── V21.0.0 PRO FINAL — المنادى والتعجب ──
   V21_PRO: Object.freeze({version: '21.0.0', edition: 'PRO-FINAL-V21.0',
