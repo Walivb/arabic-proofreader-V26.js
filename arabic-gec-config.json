@@ -1,9 +1,9 @@
 {
-  "_شرح": "إعدادات طبقة الذكاء — مصححة ومختبرة (2026-08-30): مسار Groq الصحيح هو /openai وليس الجذر، ونموذج llama-3.3-70b أوقفه Groq فالبديل qwen3.8-27b (مختبر: 164ms ودقة عالية). عدّل هذا الملف في GitHub فينتشر فورًا بلا أي لمس للقالب.",
+  "_شرح": "النسخة النهائية عبر الوسيط (Render): المفتاح يعيش داخل خادم Render فقط — هذا الملف العام بلا أي مفتاح. هذا هو المحتوى النهائي الصحيح: الصقه كاملًا في ملف arabic-gec-config.json بمستودع المحرك على GitHub ثم Commit.",
   "enabled": true,
   "backend": "openai",
-  "endpoint": "https://api.groq.com/openai",
-  "apiKey": "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",
+  "endpoint": "https://arabic-gec-proxy.onrender.com/openai",
+  "apiKey": "",
   "model": "qwen/qwen3.8-27b",
   "minConfidence": 0.75,
   "timeoutMs": 30000,
