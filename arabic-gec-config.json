@@ -3,7 +3,7 @@
   "enabled": true,
   "backend": "openai",
   "endpoint": "https://api.groq.com",
-  "apiKey": "PASTE_YOUR_GROQ_KEY_HERE",
+  "apiKey": "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",
   "model": "llama-3.3-70b-versatile",
   "minConfidence": 0.75,
   "timeoutMs": 30000,
