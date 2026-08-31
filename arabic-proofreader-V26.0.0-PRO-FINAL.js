@@ -13065,59 +13065,6 @@ const SUGGESTION_KINDS_V1910 = Object.freeze({
 const V1910_MORPHOLOGY_RULES = /^(WEAK_VERB_AGREEMENT|FIVE_VERBS_|WAW_ALJAMAA|CONTEXTUAL_TAA|HAMZA_MORPHOLOGICAL)/u;
 const V1910_FORMATTING_CLASSES = new Set(['punctuation', 'spacing', 'diacritics']);
 
-/* V26 UI Category Taxonomy — خمس فئات عرض موحّدة للمحرك والذكاء الاصطناعي.
- * لا تغيّر الحكم اللغوي ولا قرار التصحيح؛ وظيفتها تنظيم العرض فقط.
- */
-const V26_DISPLAY_CATEGORIES = Object.freeze({
-  SPELLING:   Object.freeze({code:'spelling',   label:'الأخطاء الإملائية',   icon:'spell-check'}),
-  GRAMMAR:    Object.freeze({code:'grammar',    label:'الأخطاء النحوية',    icon:'triangle-exclamation'}),
-  COMMON:     Object.freeze({code:'common',     label:'الأخطاء الشائعة',    icon:'clone'}),
-  PUNCTUATION:Object.freeze({code:'punctuation',label:'أخطاء علامات الترقيم',icon:'ellipsis'}),
-  STYLE:      Object.freeze({code:'style',      label:'تحسين الصياغة',      icon:'wand-magic-sparkles'})
-});
-
-const V26_COMMON_ERROR_RULE = /^(?:COMMON_ERROR(?:_|:)|V18(?:\.|_)8(?:\.|_)0_COMMON|COMMON_ERRORS?)/u;
-const V26_GRAMMAR_CLASSES = new Set([
-  'syntax','syntactic-case','morphology','morphological-case-marker','verb-mood','five-verbs','five-nouns',
-  'agreement','dependent','relative-clause','hal','tamyiz','number','case','diptote','exception','coordination'
-]);
-
-function displayCategoryV26(finding) {
-  const cls = String(finding?.classification || '');
-  const ruleId = String(finding?.ruleId || '');
-  const layer = String(finding?.metadata?.layer || finding?.layer || '');
-  const subtype = String(finding?.subtype || finding?.metadata?.subtype || '');
-
-  // الأخطاء الشائعة لها أولوية حتى لو صُنّفت داخليًا كإملائية.
-  if (V26_COMMON_ERROR_RULE.test(ruleId) || /commonerrors?/iu.test(layer) || /\bcommon(?:-error|_error| error)\b/iu.test(subtype)) {
-    return V26_DISPLAY_CATEGORIES.COMMON;
-  }
-  if (cls === 'punctuation' || cls === 'spacing' || /punctuat(?:ion|ing)/iu.test(ruleId) || /ترقيم/.test(String(finding?.type || ''))) {
-    return V26_DISPLAY_CATEGORIES.PUNCTUATION;
-  }
-  if (cls === 'style' || String(finding?.type || '') === 'أسلوبي' || /style|rewrite/iu.test(subtype)) {
-    return V26_DISPLAY_CATEGORIES.STYLE;
-  }
-  if (V26_ORTHOGRAPHIC_CLASSES.has(cls) || /^AI_GEC_ORTHOGRAPHY$/u.test(ruleId) || String(finding?.type || '') === 'إملائي') {
-    return V26_DISPLAY_CATEGORIES.SPELLING;
-  }
-  // النحو هنا هو الفئة الجامعة للصرف والإعراب والمطابقة؛ لأن واجهة المستخدم
-  // مطلوبة بخمس فئات فقط.
-  if (V26_GRAMMAR_CLASSES.has(cls) || /^AI_GEC_GRAMMAR$/u.test(ruleId) || /^AI_GEC_(?:CASE|MORPH)/u.test(ruleId)) {
-    return V26_DISPLAY_CATEGORIES.GRAMMAR;
-  }
-  // القيمة الافتراضية المحافظة: أي ملاحظة لغوية غير محسومة تُعرض تحت النحو
-  // بدل اختراع فئة سادسة.
-  return V26_DISPLAY_CATEGORIES.GRAMMAR;
-}
-
-function annotateDisplayCategoryV26(finding) {
-  const cat = displayCategoryV26(finding);
-  finding.displayCategory = cat.code;
-  finding.displayCategoryLabel = cat.label;
-  return finding;
-}
-
 function classifySuggestionV1910(finding, tier) {
   const cls = String(finding.classification || '');
   const ruleId = String(finding.ruleId || '');
@@ -13239,7 +13186,6 @@ function applyDecisionGovernanceV1910(context, findings) {
     finding.suggestionLabel = kind.label;
     finding.suggestionGroup = kind.group;
     finding.suggestionRank = kind.rank;
-    annotateDisplayCategoryV26(finding);
 
     // ما دون العتبة لا يُعرض خطأً البتة.
     if (assessment.tier.code === 'withheld') {
@@ -13264,33 +13210,6 @@ function applyDecisionGovernanceV1910(context, findings) {
  *  السياقية شيء، وتحسين التنسيق شيء ثالث. الخلط بينها هو ما يفقد المستخدم
  *  ثقته حين يرى «؟؟؟ ← ؟» معروضًا بوصفه خطأً نحويًا.
  * ───────────────────────────────────────────────────────────────────────── */
-function buildDisplayCategoryTracksV26(findings) {
-  const tracks = {};
-  Object.values(V26_DISPLAY_CATEGORIES).forEach(cat => {
-    tracks[cat.code] = { code: cat.code, label: cat.label, icon: cat.icon, items: [] };
-  });
-  for (const finding of (findings || [])) {
-    const cat = V26_DISPLAY_CATEGORIES[finding.displayCategory === 'spelling' ? 'SPELLING'
-      : finding.displayCategory === 'grammar' ? 'GRAMMAR'
-      : finding.displayCategory === 'common' ? 'COMMON'
-      : finding.displayCategory === 'punctuation' ? 'PUNCTUATION' : 'STYLE'];
-    tracks[cat.code].items.push(finding);
-  }
-  Object.values(tracks).forEach(track => {
-    track.count = track.items.length;
-    track.items.sort((a,b) => Number(a.index) - Number(b.index) || Number(b.confidence || 0) - Number(a.confidence || 0));
-  });
-  tracks.summary = {
-    spelling: tracks.spelling.count,
-    grammar: tracks.grammar.count,
-    common: tracks.common.count,
-    punctuation: tracks.punctuation.count,
-    style: tracks.style.count,
-    total: (findings || []).length
-  };
-  return tracks;
-}
-
 function buildSuggestionTracksV1910(findings) {
   const tracks = {
     languageErrors: {label: 'أخطاء لغوية', description: 'إملاء وصرف ونحو مقطوع به.', items: []},
@@ -18611,8 +18530,6 @@ function v2443FinalWrongCorrectionVeto(context, findings){
   // can reintroduce identical span/replacement records. Preserve separate offsets.
   ranked.visible = deduplicateFindings(ranked.visible);
   ranked.suppressed = deduplicateFindings(ranked.suppressed);
-  ranked.visible.forEach(annotateDisplayCategoryV26);
-  ranked.suppressed.forEach(annotateDisplayCategoryV26);
 
   // V19.1.0 — SafeCorrectAll: «تصحيح الكل» لا يطبّق إلا المقطوع به.
   // القرار تقاطعٌ بين سياسة V19.0 وسياسة V19.1، فلا يتوسّع الأتمتة أبدًا.
@@ -18665,8 +18582,6 @@ function v2443FinalWrongCorrectionVeto(context, findings){
   // V19.1.0 — مسارات العرض المفصولة: لا تختلط الأخطاء اللغوية بالتنسيق،
   // ولا يُعرض الاقتراح السياقي بوصفه خطأً مقررًا.
   result.tracks = buildSuggestionTracksV1910(ranked.visible);
-  result.categoryTracks = buildDisplayCategoryTracksV26(ranked.visible);
-  result.categorySummary = result.categoryTracks.summary;
   result.autoCorrectable = ranked.visible.filter(x => x.autoCorrectable);
   result.manualReview = ranked.visible.filter(x => !x.autoCorrectable);
   result.v243Phase2 = {
@@ -27102,6 +27017,9 @@ function runFullSuiteV26(options={}){
     correctV26:correctV26,
     suggestV26:suggestV26,
     correctSafeV26:correctSafeV26,
+    // V26.2 إصلاح الإعراب: دالة parse كانت غائبة من واجهة V26 فكان زر «إعراب الجمل»
+    // لا يجد المحلِّل ويعرض «تعذّر إنشاء الإعراب». الإضافة احترازية لا تغير أي سلوك قائم.
+    parse:parseV25,
     inspectDecision:inspectDecisionV26,
     inspectPOS:inspectPOSV25,
     inspectSyntax:inspectSyntaxV25,
@@ -27582,8 +27500,9 @@ var __BUNDLE_ENGINE_EXPORT = (typeof module === "object" && module.exports) ? mo
       decisionClass: 'REVIEW',
       decisionScore: cls.confidence,
       recommendedAction: 'مراجعة يدوية قبل القبول',
-      explanation: 'اقتراح نموذج الذكاء الاصطناعي (' + (info.model || DEFAULT_MODEL) + ') عبر ' + info.backend +
-        ' — يُعرض للاسترشاد وتُقبل مراجعته يدويًا (سياسة review-only).',
+      /* V26.2 خصوصية الواجهة: لا يُعرض اسم النموذج ولا الخادم في الاقتراحات —
+         رمز الذكاء 🧠 حصريًا بدل أي أحرف لاتينية، والاتصال يبقى داخليًا مع المحرك. */
+      explanation: 'اقتراح الذكاء الاصطناعي 🧠 — يُعرض للاسترشاد ويُطبَّق يدويًا بعد المراجعة.',
       evidence: ['ai-backend:' + info.backend, 'ai-mode:' + info.mode, 'subtype:' + cls.subtype],
       safeCandidate: false,
       autoCorrectable: false,
@@ -27593,9 +27512,7 @@ var __BUNDLE_ENGINE_EXPORT = (typeof module === "object" && module.exports) ? mo
       suggestionGroup: 'اقتراح الذكاء الاصطناعي',
       suggestionKind: 'ai',
       suggestionLabel: 'اقتراح ذكاء اصطناعي',
-      metadata: { ...cls.meta, backend: info.backend, model: info.model, sentenceIndex: info.sentenceIndex },
-      displayCategory: displayCategoryV26({ ...cls, ruleId: cls.ruleId, metadata: { ...cls.meta } }).code,
-      displayCategoryLabel: displayCategoryV26({ ...cls, ruleId: cls.ruleId, metadata: { ...cls.meta } }).label
+      metadata: { ...cls.meta, backend: info.backend, model: info.model, sentenceIndex: info.sentenceIndex }
     };
   }
 
